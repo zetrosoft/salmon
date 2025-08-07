@@ -38,7 +38,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  //const [employeeId, setEmployeeId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEmployeeAndPlans = async () => {
