@@ -7,9 +7,11 @@ import { useState } from 'react';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (userId: string) => {
     setIsLoggedIn(true);
+    setLoggedInUserId(userId);
   };
 
   const handleLogout = () => {
@@ -29,7 +31,7 @@ function App() {
           backgroundColor: theme.palette.background.default, // Use theme background color
         }}
       >
-        {isLoggedIn ? <VisitListPage onLogout={handleLogout} /> : <LoginPage onLoginSuccess={handleLoginSuccess} />}
+        {isLoggedIn ? <VisitListPage onLogout={handleLogout} userId={loggedInUserId} /> : <LoginPage onLoginSuccess={handleLoginSuccess} />}
       </Box>
     </ThemeProvider>
   );

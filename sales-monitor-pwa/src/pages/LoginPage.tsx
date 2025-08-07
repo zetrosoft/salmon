@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { login } from '../api/frappeApi'; // Changed from mockApi
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (userId: string) => void;
 }
 
 const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
@@ -19,8 +19,8 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
 
     try {
       const response = await login(username, password); // Changed from mockLogin
-      if (response.success) {
-        onLoginSuccess();
+      if (response.success && response.userId) {
+        onLoginSuccess(response.userId);
       } else {
         setError(response.message || 'Login failed');
       }

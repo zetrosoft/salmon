@@ -28,6 +28,7 @@ interface LoginResponse {
   message?: string;
   token?: string; // Frappe doesn't typically return a token for session login
   salesName?: string;
+  userId?: string;
 }
 
 export const login = async (username: string, password: string): Promise<LoginResponse> => {
@@ -40,7 +41,7 @@ export const login = async (username: string, password: string): Promise<LoginRe
     if (response.data.message === 'Logged In') {
       // You might need to fetch user details or sales_name after successful login
       // For now, we'll just return success and a dummy salesName
-      return { success: true, salesName: username }; 
+      return { success: true, salesName: username, userId: response.data.user_id }; 
     } else {
       return { success: false, message: response.data.message || 'Login failed' };
     }
@@ -65,10 +66,12 @@ interface VisitPlan {
 export const getVisitPlans = async (salesName: string): Promise<VisitPlan[]> => {
   try {
     // Assuming a custom Frappe method to get visit plans for a sales user
-    const response = await api.get('/api/method/sales_monitor.sales_monitor.api.get_sales_visit_plans', {
+    const response = await api.get('/api/method/sales_monitor.api.get_sales_visit_plans', {
       params: { sales_name: salesName, date: new Date().toISOString().split('T')[0] }, // Pass sales_name and current date
     });
     // Frappe API usually returns data in response.data.message or response.data.data
+   console.log(response);
+    
     return response.data.message || response.data.data || [];
   } catch (error: any) {
     console.error("Error fetching visit plans:", error.response?.data || error.message);
@@ -90,7 +93,7 @@ export const updateVisitPlanStatus = async (name: string, newStatus: 'Check-in' 
     }
 
     // Assuming a custom Frappe method to update visit plan status
-    const response = await api.post('/api/method/sales_monitor.sales_monitor.api.update_sales_visit_plan_status', payload, {
+    const response = await api.post('/api/method/sales_monitor.api.update_sales_visit_plan_status', payload, {
       headers: {
         'X-Frappe-CSRF-Token': csrfToken || '', // Include CSRF token if available
       },
@@ -103,10 +106,22 @@ export const updateVisitPlanStatus = async (name: string, newStatus: 'Check-in' 
 };
 
 // Placeholder for getting order history
+export const getEmployeeId = async (userId: string): Promise<string | null> => {
+  try {
+    const response = await api.get('/api/method/sales_monitor.api.get_employee_id', {
+      params: { user_id: userId },
+    });
+    return response.data.message || null;
+  } catch (error: any) {
+    console.error("Error fetching employee ID:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch employee ID.');
+  }
+};
+
 export const getOrderHistory = async (storeName: string): Promise<any[]> => {
   try {
     // Assuming a custom Frappe method to get order history for a store
-    const response = await api.get('/api/method/sales_monitor.sales_monitor.api.get_order_history', {
+    const response = await api.get('/api/method/sales_monitor.api.get_order_history', {
       params: { store_name: storeName },
     });
     return response.data.message || response.data.data || [];

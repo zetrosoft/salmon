@@ -1,5 +1,3 @@
-# This is a more realistic api.py file for your Frappe application.
-# YOU MUST VERIFY AND ADJUST DOCTYPE NAMES AND FIELD NAMES TO MATCH YOUR ACTUAL FRAPPE SETUP.
 
 import frappe
 from frappe.utils import getdate, now_datetime
@@ -21,19 +19,20 @@ def get_sales_visit_plans(sales_name, date):
             "Sales Visit Plan",
             filters={
                 "sales_person": sales_name,
-                "visit_date": today_date,
+                "planned_visit_date": today_date, # Changed to planned_visit_date as per db structure
                 "status": ["!=", "Selesai"] # Exclude completed plans
             },
             fields=[
                 "name",
-                "customer as store_name", # Assuming 'customer' is the store name
-                "address",
+                "customer_name as store_name", # Using customer_name as per db structure
+                "planned_location_address as address", # Using planned_location_address as per db structure
                 "status",
-                "checkin_time",
-                "checkout_time",
-                "latitude",
-                "longitude",
-                "photo_url"
+                "planned_location_latitude as latitude", # Using planned_location_latitude as per db structure
+                "planned_location_longitude as longitude", # Using planned_location_longitude as per db structure
+                "planned_visit_date",
+                "planned_visit_time",
+                "notes",
+                "sales_activity_log"
             ],
             as_dict=True
         )
@@ -115,3 +114,12 @@ def get_order_history(store_name):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error in get_order_history")
         frappe.throw(f"Failed to fetch order history: {e}")
+
+@frappe.whitelist()
+def get_employee_id(user_id):
+    try:
+        employee = frappe.db.get_value("Employee", {"user_id": user_id}, "name")
+        return employee
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Error in get_employee_id")
+        frappe.throw(f"Failed to fetch employee ID: {e}")

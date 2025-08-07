@@ -1,6 +1,6 @@
 import { AppBar, Toolbar, Typography, Container, List, ListItem, ListItemText, Paper, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
-import { getVisitPlans, updateVisitPlanStatus, getOrderHistory } from '../api/frappeApi'; // Changed from mockApi
+import { getVisitPlans, updateVisitPlanStatus, getOrderHistory, getEmployeeId } from '../api/frappeApi'; // Changed from mockApi
 import HistoryIcon from '@mui/icons-material/History';
 import ScheduleIcon from '@mui/icons-material/Schedule'; // For Terjadwal
 import LocationOnIcon from '@mui/icons-material/LocationOn'; // For Check-in
@@ -22,35 +22,48 @@ interface VisitPlan {
 
 interface VisitListPageProps {
   onLogout: () => void;
+  userId: string | null;
 }
 
-const VisitListPage = ({ onLogout }: VisitListPageProps) => {
+const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
   const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openCheckoutDialog, setOpenCheckoutDialog] = useState(false);
-  const [currentPlanName, setCurrentPlanName] = useState<string | null>(null); // Changed from currentPlanId
+  const [currentPlanName, setCurrentPlanName] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null); // Changed from lat/lng
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchPlans = async () => {
+    const fetchEmployeeAndPlans = async () => {
+      if (!userId) {
+        setError("User ID not available.");
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
-        const plans = await getVisitPlans('Sales User'); // Mock salesName, will be dynamic with actual login
-        setVisitPlans(plans);
+        const empId = await getEmployeeId(userId);
+        if (empId) {
+          setEmployeeId(empId);
+          const plans = await getVisitPlans(empId);
+          setVisitPlans(plans);
+        } else {
+          setError("Employee ID not found for this user.");
+        }
       } catch (err: any) {
-        setError(err.message || 'Failed to fetch visit plans.');
+        setError(err.message || 'Failed to fetch data.');
       } finally {
         setLoading(false);
       }
     };
-    fetchPlans();
-  }, []);
+    fetchEmployeeAndPlans();
+  }, [userId]);
 
   const handleCheckIn = async (name: string) => {
     try {
