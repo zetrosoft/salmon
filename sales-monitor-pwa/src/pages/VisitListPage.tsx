@@ -13,7 +13,7 @@ interface VisitPlan {
   name: string; // Frappe DocType name (e.g., 'SVP0001')
   store_name: string; // Changed from storeName
   address: string;
-  status: 'Draft' | 'Planned' | 'Check-in' | 'Completed' | 'Canceled';
+  status: 'Draft' | 'Planned' | 'Checked In' | 'Completed' | 'Canceled';
   checkin_time?: string; // Changed from checkinTime
   checkout_time?: string; // Changed from checkoutTime
   latitude?: number; // Changed from lat
@@ -70,12 +70,12 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
   const handleCheckIn = async (name: string) => {
     try {
       setLoading(true);
-      const success = await updateVisitPlanStatus(name, 'Check-in');
+      const success = await updateVisitPlanStatus(name, 'Checked In');
       if (success) {
         setVisitPlans(prevPlans =>
           prevPlans.map(plan =>
             plan.name === name
-              ? { ...plan, status: 'Check-in', checkin_time: new Date().toLocaleTimeString() }
+              ? { ...plan, status: 'Checked In', checkin_time: new Date().toLocaleTimeString() }
               : plan
           )
         );
@@ -205,7 +205,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
       case 'Draft':
       case 'Planned':
         return <ScheduleIcon color="info" sx={{ verticalAlign: 'middle', mr: 0.5 }} />;
-      case 'Check-in':
+      case 'Checked In':
         return <LocationOnIcon color="warning" sx={{ verticalAlign: 'middle', mr: 0.5 }} />;
       case 'Completed':
         return <TaskAltIcon color="success" sx={{ verticalAlign: 'middle', mr: 0.5 }} />;
@@ -267,38 +267,41 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
           ) : (
             visitPlans.map((plan) => (
               <Paper key={plan.name} elevation={2} sx={{ mb: 2, p: 2 }}>
-                <ListItem disableGutters>
+                <ListItem disableGutters sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                   <ListItemText
                     primary={plan.store_name}
                     secondary={
                       <>
-                        <Typography component="span" variant="body2" color="text.primary">
-                          {plan.address}
-                        </Typography>
-                        <br />
                         <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center' }}>
                           {getStatusIcon(plan.status)}
                           Status: {plan.status}
                         </Box>
+                        <br />
+                        <Typography component="span" variant="body2" color="text.primary">
+                          {plan.address}
+                        </Typography>
                         {plan.checkin_time && <>, Check-in: {plan.checkin_time}</>}
                         {plan.checkout_time && <>, Check-out: {plan.checkout_time}</>}
                       </>
                     }
+                    sx={{ width: '100%' }} // Ensure text takes full width
                   />
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <IconButton aria-label="view order history" onClick={() => handleViewOrderHistory(plan.store_name)} sx={{ mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mt: 1 }}>
+                    <IconButton aria-label="view order history" onClick={() => handleViewOrderHistory(plan.store_name)}>
                       <HistoryIcon />
                     </IconButton>
-                    {(plan.status === 'Draft' || plan.status === 'Planned') && (
-                      <Button variant="contained" onClick={() => handleCheckIn(plan.name)}>
-                        Check-in
-                      </Button>
-                    )}
-                    {plan.status === 'Check-in' && (
-                      <Button variant="contained" color="secondary" onClick={() => handleOpenCheckout(plan.name)}>
-                        Checkout
-                      </Button>
-                    )}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      {(plan.status === 'Draft' || plan.status === 'Planned') && (
+                        <Button variant="contained" onClick={() => handleCheckIn(plan.name)}>
+                          Check-in
+                        </Button>
+                      )}
+                      {plan.status === 'Checked In' && (
+                        <Button variant="contained" color="secondary" onClick={() => handleOpenCheckout(plan.name)}>
+                          Checkout
+                        </Button>
+                      )}
+                    </Box>
                   </Box>
                 </ListItem>
               </Paper>

@@ -4,7 +4,7 @@ import theme from './theme';
 import LoginPage from './pages/LoginPage';
 import VisitListPage from './pages/VisitListPage';
 import { useState, useEffect } from 'react';
-import { checkSession } from './api/frappeApi';
+import { checkSession, logout } from './api/frappeApi';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);

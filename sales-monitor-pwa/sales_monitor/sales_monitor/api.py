@@ -14,7 +14,7 @@ def get_sales_visit_plans(sales_name, date):
     try:
         # Fetch Sales Visit Plans for the given sales_name and today's date
         # Filter out 'Selesai' status as per PWA logic
-        visit_plans = frappe.db.get_list(
+        raw_visit_plans = frappe.db.get_list(
             "Sales Visit Plan",
             filters={
                 "sales_person": sales_name,
@@ -23,7 +23,7 @@ def get_sales_visit_plans(sales_name, date):
             },
             fields=[
                 "name",
-                "customer_name as store_name", # Using customer_name as per db structure
+                "customer as store_name", # Using customer_name as per db structure
                 "planned_location_address as address", # Using planned_location_address as per db structure
                 "status",
                 "planned_location_latitude as latitude", # Using planned_location_latitude as per db structure
@@ -33,8 +33,9 @@ def get_sales_visit_plans(sales_name, date):
                 "notes",
                 "sales_activity_log"
             ]
-            #as_dict=True
         )
+        # Manually convert to list of dictionaries if not already
+        visit_plans = [dict(d) for d in raw_visit_plans]
         return visit_plans
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error in get_sales_visit_plans")
@@ -50,7 +51,7 @@ def update_sales_visit_plan_status(name, new_status, latitude=None, longitude=No
         doc = frappe.get_doc("Sales Visit Plan", name)
         doc.status = new_status
 
-        if new_status == "Check-in":
+        if new_status == "Checked In":
             doc.checkin_time = now_datetime()
             # Log activity
             frappe.get_doc({
@@ -62,7 +63,7 @@ def update_sales_visit_plan_status(name, new_status, latitude=None, longitude=No
                 "customer": doc.customer # ASSUMPTION: customer field exists
             }).insert(ignore_permissions=True)
 
-        elif new_status == "Selesai":
+        elif new_status == "Completed":
             doc.checkout_time = now_datetime()
             doc.latitude = latitude
             doc.longitude = longitude
@@ -95,7 +96,7 @@ def get_order_history(store_name):
     # ASSUMPTION: It has fields like 'name' (for order_id), 'transaction_date', 'grand_total'
 
     try:
-        orders = frappe.db.get_list(
+        raw_orders = frappe.db.get_list(
             "Sales Order", # ASSUMPTION: DocType name
             filters={
                 "customer_name": store_name # ASSUMPTION: field name
@@ -106,9 +107,10 @@ def get_order_history(store_name):
                 "grand_total as total" # ASSUMPTION: field name
             ],
             order_by="transaction_date desc",
-            limit=15 # Limit to last 5 orders for example
-            #as_dict=True
+            limit=5 # Limit to last 5 orders for example
         )
+        # Manually convert to list of dictionaries if not already
+        orders = [dict(d) for d in raw_orders]
         return orders
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error in get_order_history")

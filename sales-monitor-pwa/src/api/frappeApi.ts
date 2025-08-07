@@ -66,7 +66,7 @@ interface VisitPlan {
   name: string; // Frappe DocType name (e.g., 'SVP0001')
   store_name: string;
   address: string;
-  status: 'Terjadwal' | 'Check-in' | 'Selesai';
+  status: 'Draft' | 'Planned' | 'Checked In' | 'Completed' | 'Canceled';
   checkin_time?: string;
   checkout_time?: string;
   latitude?: number;
@@ -90,7 +90,7 @@ export const getVisitPlans = async (salesName: string): Promise<VisitPlan[]> => 
   }
 };
 
-export const updateVisitPlanStatus = async (name: string, newStatus: 'Check-in' | 'Selesai', data?: { latitude?: number, longitude?: number, photo_url?: string }): Promise<boolean> => {
+export const updateVisitPlanStatus = async (name: string, newStatus: 'Checked In' | 'Completed', data?: { latitude?: number, longitude?: number, photo_url?: string }): Promise<boolean> => {
   try {
     const csrfToken = await getCsrfToken(); // Get CSRF token if needed
     const payload: any = {
