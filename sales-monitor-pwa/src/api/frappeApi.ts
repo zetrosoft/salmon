@@ -38,10 +38,21 @@ export const login = async (username: string, password: string): Promise<LoginRe
       pwd: password,
     });
 
-    if (response.data.message === 'Logged In') {
-      // You might need to fetch user details or sales_name after successful login
-      // For now, we'll just return success and a dummy salesName
-      return { success: true, salesName: username, userId: response.data.user_id }; 
+    if (response.status === 200) { // Assuming 200 OK means successful login
+      const userDetailsResponse = await api.get('/api/method/sales_monitor.api.get_current_user_id');
+      const userId = userDetailsResponse.data.message; // This should be the user's email/username
+
+      if (userId) {
+        // Now fetch the employee ID using the custom API
+        const employeeId = await getEmployeeId(userId);
+        if (employeeId) {
+          return { success: true, salesName: employeeId, userId: userId };
+        } else {
+          return { success: false, message: 'Employee ID not found for this user.' };
+        }
+      } else {
+        return { success: false, message: 'Failed to retrieve logged-in user details.' };
+      }
     } else {
       return { success: false, message: response.data.message || 'Login failed' };
     }
@@ -70,7 +81,7 @@ export const getVisitPlans = async (salesName: string): Promise<VisitPlan[]> => 
       params: { sales_name: salesName, date: new Date().toISOString().split('T')[0] }, // Pass sales_name and current date
     });
     // Frappe API usually returns data in response.data.message or response.data.data
-   console.log(response);
+   //console.log(response);
     
     return response.data.message || response.data.data || [];
   } catch (error: any) {

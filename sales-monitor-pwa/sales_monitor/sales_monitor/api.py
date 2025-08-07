@@ -1,4 +1,3 @@
-
 import frappe
 from frappe.utils import getdate, now_datetime
 
@@ -33,8 +32,8 @@ def get_sales_visit_plans(sales_name, date):
                 "planned_visit_time",
                 "notes",
                 "sales_activity_log"
-            ],
-            as_dict=True
+            ]
+            #as_dict=True
         )
         return visit_plans
     except Exception as e:
@@ -107,8 +106,8 @@ def get_order_history(store_name):
                 "grand_total as total" # ASSUMPTION: field name
             ],
             order_by="transaction_date desc",
-            limit=5, # Limit to last 5 orders for example
-            as_dict=True
+            limit=15 # Limit to last 5 orders for example
+            #as_dict=True
         )
         return orders
     except Exception as e:
@@ -123,3 +122,11 @@ def get_employee_id(user_id):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error in get_employee_id")
         frappe.throw(f"Failed to fetch employee ID: {e}")
+
+@frappe.whitelist()
+def get_current_user_id():
+    try:
+        return frappe.session.user
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Error in get_current_user_id")
+        frappe.throw(f"Failed to get current user ID: {e}")

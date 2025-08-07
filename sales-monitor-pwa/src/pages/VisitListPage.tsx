@@ -49,6 +49,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
       try {
         setLoading(true);
         const empId = await getEmployeeId(userId);
+        console.log(empId);
         if (empId) {
           setEmployeeId(empId);
           const plans = await getVisitPlans(empId);
