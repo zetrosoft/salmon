@@ -1,22 +1,49 @@
 
-import { ThemeProvider, CssBaseline, Box } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import theme from './theme';
 import LoginPage from './pages/LoginPage';
 import VisitListPage from './pages/VisitListPage';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { checkSession } from './api/frappeApi';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const verifySession = async () => {
+      const { userId, employeeId } = await checkSession();
+      if (userId && employeeId) {
+        setIsLoggedIn(true);
+        setLoggedInUserId(userId);
+      } else {
+        setIsLoggedIn(false);
+        setLoggedInUserId(null);
+      }
+      setLoading(false);
+    };
+    verifySession();
+  }, []);
 
   const handleLoginSuccess = (userId: string) => {
     setIsLoggedIn(true);
     setLoggedInUserId(userId);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await logout(); // Call the logout API
     setIsLoggedIn(false);
+    setLoggedInUserId(null);
   };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>

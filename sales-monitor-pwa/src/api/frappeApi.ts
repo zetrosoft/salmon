@@ -141,3 +141,30 @@ export const getOrderHistory = async (storeName: string): Promise<any[]> => {
     throw new Error(error.response?.data?.message || 'Failed to fetch order history.');
   }
 };
+
+export const checkSession = async (): Promise<{ userId: string | null; employeeId: string | null }> => {
+  try {
+    const userDetailsResponse = await api.get('/api/method/sales_monitor.api.get_current_user_id');
+    const userId = userDetailsResponse.data.message; // This should be the user's email/username
+
+    if (userId) {
+      const employeeId = await getEmployeeId(userId);
+      return { userId, employeeId };
+    } else {
+      return { userId: null, employeeId: null };
+    }
+  } catch (error) {
+    console.error("Error checking session:", error);
+    return { userId: null, employeeId: null };
+  }
+};
+
+export const logout = async (): Promise<boolean> => {
+  try {
+    const response = await api.post('/api/method/logout');
+    return response.data.message === 'Logged Out';
+  } catch (error) {
+    console.error("Error logging out:", error);
+    return false;
+  }
+};

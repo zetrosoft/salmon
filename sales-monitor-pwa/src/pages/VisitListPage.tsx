@@ -7,12 +7,13 @@ import LocationOnIcon from '@mui/icons-material/LocationOn'; // For Check-in
 import TaskAltIcon from '@mui/icons-material/TaskAlt'; // For Selesai
 import LogoutIcon from '@mui/icons-material/Logout'; // For Logout button
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'; // For Back button
+import CancelIcon from '@mui/icons-material/Cancel'; // For Canceled
 
 interface VisitPlan {
   name: string; // Frappe DocType name (e.g., 'SVP0001')
   store_name: string; // Changed from storeName
   address: string;
-  status: 'Terjadwal' | 'Check-in' | 'Selesai';
+  status: 'Draft' | 'Planned' | 'Check-in' | 'Completed' | 'Canceled';
   checkin_time?: string; // Changed from checkinTime
   checkout_time?: string; // Changed from checkoutTime
   latitude?: number; // Changed from lat
@@ -163,7 +164,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
     setCheckoutError(null);
 
     try {
-      const success = await updateVisitPlanStatus(currentPlanName, 'Selesai', {
+      const success = await updateVisitPlanStatus(currentPlanName, 'Completed', {
         latitude: currentLocation?.latitude,
         longitude: currentLocation?.longitude,
         photo_url: photoDataUrl || undefined,
@@ -173,7 +174,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
         setVisitPlans(prevPlans =>
           prevPlans.map(plan =>
             plan.name === currentPlanName
-              ? { ...plan, status: 'Selesai', checkout_time: new Date().toLocaleTimeString(), latitude: currentLocation?.latitude, longitude: currentLocation?.longitude, photo_url: photoDataUrl }
+              ? { ...plan, status: 'Completed', checkout_time: new Date().toLocaleTimeString(), latitude: currentLocation?.latitude, longitude: currentLocation?.longitude, photo_url: photoDataUrl }
               : plan
           )
         );
@@ -201,12 +202,15 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
 
   const getStatusIcon = (status: VisitPlan['status']) => {
     switch (status) {
-      case 'Terjadwal':
+      case 'Draft':
+      case 'Planned':
         return <ScheduleIcon color="info" sx={{ verticalAlign: 'middle', mr: 0.5 }} />;
       case 'Check-in':
         return <LocationOnIcon color="warning" sx={{ verticalAlign: 'middle', mr: 0.5 }} />;
-      case 'Selesai':
+      case 'Completed':
         return <TaskAltIcon color="success" sx={{ verticalAlign: 'middle', mr: 0.5 }} />;
+      case 'Canceled':
+        return <CancelIcon color="error" sx={{ verticalAlign: 'middle', mr: 0.5 }} />;
       default:
         return null;
     }
@@ -285,7 +289,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
                     <IconButton aria-label="view order history" onClick={() => handleViewOrderHistory(plan.store_name)} sx={{ mb: 1 }}>
                       <HistoryIcon />
                     </IconButton>
-                    {plan.status === 'Terjadwal' && (
+                    {(plan.status === 'Draft' || plan.status === 'Planned') && (
                       <Button variant="contained" onClick={() => handleCheckIn(plan.name)}>
                         Check-in
                       </Button>
