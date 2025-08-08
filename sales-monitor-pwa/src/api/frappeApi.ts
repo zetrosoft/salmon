@@ -1,12 +1,15 @@
 
 import axios from 'axios';
 
-//const API_BASE_URL = 'https://localhost:8080'; // Your Frappe instance URL
 const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
+//const API_BASE_URL = 'http://35.219.54.8:8882'; // Your Frappe instance URL
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Important for handling session cookies
+  withCredentials: true, // Send cookies with every request
 });
+
+// Remove the Expect header to prevent 417 errors with some servers/proxies
+delete api.defaults.headers.common['Expect'];
 
 // Function to get CSRF token (Frappe often requires this for non-GET requests)
 // In a real scenario, you might fetch this from a specific endpoint or a cookie
@@ -33,28 +36,29 @@ interface LoginResponse {
 
 export const login = async (username: string, password: string): Promise<LoginResponse> => {
   try {
-    const response = await api.post('/api/method/login', {
+    const response = await api.post('/api/method/sales_monitor.api.pwa_login', {
       usr: username,
       pwd: password,
     });
 
-    if (response.status === 200) { // Assuming 200 OK means successful login
-      const userDetailsResponse = await api.get('/api/method/sales_monitor.api.get_current_user_id');
-      const userId = userDetailsResponse.data.message; // This should be the user's email/username
+    const responseData = response.data.message; // Frappe wraps the response in a 'message' key
 
-      if (userId) {
-        // Now fetch the employee ID using the custom API
-        const employeeId = await getEmployeeId(userId);
-        if (employeeId) {
-          return { success: true, salesName: employeeId, userId: userId };
-        } else {
-          return { success: false, message: 'Employee ID not found for this user.' };
-        }
-      } else {
-        return { success: false, message: 'Failed to retrieve logged-in user details.' };
+    if (response.status === 200 && responseData && responseData.status === 'success') {
+      const allowedRoles = ["Sales User", "Sales Manager", "Sales"];
+      const userRoles = responseData.roles || [];
+
+      if (!userRoles.some((role: string) => allowedRoles.includes(role))) {
+        return { success: false, message: "Hanya User Sales yang di ijinkan" };
       }
+
+      if (!responseData.employee_id) {
+        return { success: false, message: "Employee ID tidak ditemukan untuk user ini." };
+      }
+
+      return { success: true, salesName: responseData.employee_id, userId: responseData.user_id };
     } else {
-      return { success: false, message: response.data.message || 'Login failed' };
+      const errorMessage = responseData?.message || response.data?.message || 'Login failed';
+      return { success: false, message: errorMessage };
     }
   } catch (error: any) {
     console.error("Login error:", error.response?.data || error.message);
@@ -142,20 +146,30 @@ export const getOrderHistory = async (storeName: string): Promise<any[]> => {
   }
 };
 
-export const checkSession = async (): Promise<{ userId: string | null; employeeId: string | null }> => {
-  try {
-    const userDetailsResponse = await api.get('/api/method/sales_monitor.api.get_current_user_id');
-    const userId = userDetailsResponse.data.message; // This should be the user's email/username
+interface SalesActivity {
+  Date: string;
+  Customer: string;
+  Checkin: string;
+  Checkout: string;
+  Duration: number;
+  Status: string;
+}
 
-    if (userId) {
-      const employeeId = await getEmployeeId(userId);
-      return { userId, employeeId };
-    } else {
-      return { userId: null, employeeId: null };
-    }
-  } catch (error) {
-    console.error("Error checking session:", error);
-    return { userId: null, employeeId: null };
+export const getSalesActivityHistory = async (salesPerson: string, fromDate?: string, toDate?: string, customer?: string): Promise<SalesActivity[]> => {
+  try {
+    const params: any = { sales_person: salesPerson };
+    if (fromDate) params.from_date = fromDate;
+    if (toDate) params.to_date = toDate;
+    if (customer) params.customer = customer;
+
+    const response = await api.get('/api/method/sales_monitor.api.get_sales_activity_history', {
+      params: params,   
+    });
+    console.log(response)
+    return response.data.message || [];
+  } catch (error: any) {
+    //console.error("Error fetching sales activity history:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch sales activity history.');
   }
 };
 

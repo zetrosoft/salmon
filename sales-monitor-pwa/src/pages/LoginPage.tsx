@@ -1,9 +1,9 @@
 import { Box, Button, Container, TextField, Typography, Paper, CircularProgress, Alert } from '@mui/material';
 import { useState } from 'react';
-import { login } from '../api/frappeApi'; // Changed from mockApi
+import { login } from '../api/frappeApi';
 
 interface LoginPageProps {
-  onLoginSuccess: (userId: string) => void;
+  onLoginSuccess: (userId: string, employeeId: string) => void;
 }
 
 const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
@@ -18,14 +18,16 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
     setError(null);
 
     try {
-      const response = await login(username, password); // Changed from mockLogin
-      if (response.success && response.userId) {
-        onLoginSuccess(response.userId);
+      const response = await login(username, password);
+      if (response.success && response.userId && response.salesName) {
+        onLoginSuccess(response.userId, response.salesName);
       } else {
-        setError(response.message || 'Login failed');
+        const errorMessage = typeof response.message === 'string' ? response.message : 'Login failed';
+        setError(errorMessage);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      const errorMessage = typeof err.message === 'string' ? err.message : 'An unexpected error occurred.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

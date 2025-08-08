@@ -1,6 +1,7 @@
 import { AppBar, Toolbar, Typography, Container, List, ListItem, ListItemText, Paper, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
-import { getVisitPlans, updateVisitPlanStatus, getOrderHistory, getEmployeeId } from '../api/frappeApi'; // Changed from mockApi
+import { getVisitPlans, updateVisitPlanStatus, getOrderHistory, getEmployeeId, getSalesActivityHistory } from '../api/frappeApi'; // Changed from mockApi
+import { useNavigate } from 'react-router-dom';
 import HistoryIcon from '@mui/icons-material/History';
 import ScheduleIcon from '@mui/icons-material/Schedule'; // For Terjadwal
 import LocationOnIcon from '@mui/icons-material/LocationOn'; // For Check-in
@@ -24,9 +25,11 @@ interface VisitPlan {
 interface VisitListPageProps {
   onLogout: () => void;
   userId: string | null;
+  employeeId: string | null;
 }
 
-const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
+const VisitListPage = ({ onLogout, userId, employeeId }: VisitListPageProps) => {
+  const navigate = useNavigate();
   const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,31 +44,24 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
   //const [employeeId, setEmployeeId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchEmployeeAndPlans = async () => {
-      if (!userId) {
-        setError("User ID not available.");
+    const fetchVisitPlans = async () => {
+      if (!employeeId) {
+        setError("Employee ID not available.");
         setLoading(false);
         return;
       }
       try {
         setLoading(true);
-        const empId = await getEmployeeId(userId);
-        console.log(empId);
-        if (empId) {
-          setEmployeeId(empId);
-          const plans = await getVisitPlans(empId);
-          setVisitPlans(plans);
-        } else {
-          setError("Employee ID not found for this user.");
-        }
+        const plans = await getVisitPlans(employeeId);
+        setVisitPlans(plans);
       } catch (err: any) {
         setError(err.message || 'Failed to fetch data.');
       } finally {
         setLoading(false);
       }
     };
-    fetchEmployeeAndPlans();
-  }, [userId]);
+    fetchVisitPlans();
+  }, [employeeId]);
 
   const handleCheckIn = async (name: string) => {
     try {
@@ -189,14 +185,12 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
     }
   };
 
-  const handleViewOrderHistory = async (storeName: string) => {
-    try {
-      const history = await getOrderHistory(storeName);
-      alert(`Order history for ${storeName}:\n${JSON.stringify(history, null, 2)}`);
-      // In a real application, this would navigate to a new page or open a dialog
-      // to display the order history data fetched from the backend.
-    } catch (err: any) {
-      alert(`Failed to fetch order history for ${storeName}: ${err.message}`);
+  const handleViewOrderHistory = (storeName: string) => {
+    if (employeeId) {
+      console.log("Navigating to history with:", { employeeId, storeName });
+      navigate(`/history/${employeeId}/${storeName}`);
+    } else {
+      alert("Employee ID not available to view history.");
     }
   };
 
@@ -246,7 +240,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
             <ArrowBackIcon />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Rencana Kunjungan Hari Ini
+            Rencana Kunjungan
           </Typography>
           <IconButton
             edge="end"
@@ -280,6 +274,7 @@ const VisitListPage = ({ onLogout, userId }: VisitListPageProps) => {
                         <Typography component="span" variant="body2" color="text.primary">
                           {plan.address}
                         </Typography>
+                        {plan.planned_visit_time && <>, Waktu Kunjungan: {plan.planned_visit_time}</>}
                         {plan.checkin_time && <>, Check-in: {plan.checkin_time}</>}
                         {plan.checkout_time && <>, Check-out: {plan.checkout_time}</>}
                       </>
