@@ -1,64 +1,72 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
-//const API_BASE_URL = 'http://35.219.54.8:8882'; // Your Frappe instance URL
+const API_BASE_URL = 'http://35.219.54.8.8882';//'http://localhost:8080'; // Your Frappe instance URL
+
+// --- HARDCODED API KEY & SECRET (FOR DEVELOPMENT ONLY) ---
+const HARDCODED_API_KEY = '691dc30ced24013';//'2b7d7c65471aecf';
+const HARDCODED_API_SECRET = 'c4c52d2694638d1';// '2fa510cb40c011b';
+// ----------------------------------------------------------
+
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Send cookies with every request
+  withCredentials: true, // Still needed for initial session login
 });
 
 // Remove the Expect header to prevent 417 errors with some servers/proxies
 delete api.defaults.headers.common['Expect'];
 
-// Function to get CSRF token (Frappe often requires this for non-GET requests)
-// In a real scenario, you might fetch this from a specific endpoint or a cookie
-const getCsrfToken = async (): Promise<string | null> => {
-  try {
-    // Frappe usually sets a `_csrf_token` cookie or has an endpoint to get it.
-    // For simplicity, we'll assume it's handled by `withCredentials` for now
-    // or you might need to fetch it from /api/method/frappe.auth.get_csrf_token
-    // For now, returning null, and will add a placeholder for it in requests if needed.
-    return null; 
-  } catch (error) {
-    console.error("Error fetching CSRF token:", error);
-    return null;
+// Add a request interceptor to include the Authorization header for all requests
+api.interceptors.request.use(config => {
+  // Only add Authorization header if it's not the initial login request
+  // and if hardcoded keys are available
+  if (config.url !== '/api/method/login' && HARDCODED_API_KEY && HARDCODED_API_SECRET) {
+    config.headers.Authorization = `token ${HARDCODED_API_KEY}:${HARDCODED_API_SECRET}`;
   }
-};
+  return config;
+}, error => {
+  return Promise.reject(error);
+});
 
 interface LoginResponse {
   success: boolean;
   message?: string;
-  token?: string; // Frappe doesn't typically return a token for session login
   salesName?: string;
   userId?: string;
 }
 
 export const login = async (username: string, password: string): Promise<LoginResponse> => {
   try {
-    const response = await api.post('/api/method/sales_monitor.api.pwa_login', {
+    // Step 1: Perform standard username/password login to establish session
+    const response = await api.post('/api/method/login', {
       usr: username,
       pwd: password,
     });
 
-    const responseData = response.data.message; // Frappe wraps the response in a 'message' key
+    if (response.status !== 200) {
+      return { success: false, message: response.data.message || 'Login failed' };
+    }
 
-    if (response.status === 200 && responseData && responseData.status === 'success') {
-      const allowedRoles = ["Sales User", "Sales Manager", "Sales"];
-      const userRoles = responseData.roles || [];
+    // Step 2: After successful session login, use API Key to get user details
+    // The interceptor will add the Authorization header for this request
+    const userDetailsResponse = await api.get('/api/method/frappe.auth.get_logged_user');
+    const userId = userDetailsResponse.data.message; // This should be the user's email/username
 
-      if (!userRoles.some((role: string) => allowedRoles.includes(role))) {
-        return { success: false, message: "Hanya User Sales yang di ijinkan" };
+    if (userId) {
+      // Frappe's get_logged_user returns 'Guest' if not logged in, or the user ID
+      if (userId === 'Guest') {
+        return { success: false, message: 'Login failed: User is Guest.' };
       }
 
-      if (!responseData.employee_id) {
-        return { success: false, message: "Employee ID tidak ditemukan untuk user ini." };
+      const employeeId = await getEmployeeId(userId);
+      if (employeeId) {
+        // You might want to add role validation here if needed
+        return { success: true, salesName: employeeId, userId: userId };
+      } else {
+        return { success: false, message: 'Employee ID not found for this user.' };
       }
-
-      return { success: true, salesName: responseData.employee_id, userId: responseData.user_id };
     } else {
-      const errorMessage = responseData?.message || response.data?.message || 'Login failed';
-      return { success: false, message: errorMessage };
+      return { success: false, message: 'Failed to retrieve logged-in user details.' };
     }
   } catch (error: any) {
     console.error("Login error:", error.response?.data || error.message);
@@ -71,22 +79,19 @@ interface VisitPlan {
   store_name: string;
   address: string;
   status: 'Draft' | 'Planned' | 'Checked In' | 'Completed' | 'Canceled';
+  planned_visit_time?: string;
   checkin_time?: string;
   checkout_time?: string;
   latitude?: number;
   longitude?: number;
-  photo_url?: string;
+  photo_url?: string | null;
 }
 
 export const getVisitPlans = async (salesName: string): Promise<VisitPlan[]> => {
   try {
-    // Assuming a custom Frappe method to get visit plans for a sales user
     const response = await api.get('/api/method/sales_monitor.api.get_sales_visit_plans', {
-      params: { sales_name: salesName, date: new Date().toISOString().split('T')[0] }, // Pass sales_name and current date
+      params: { sales_name: salesName, date: new Date().toISOString().split('T')[0] },
     });
-    // Frappe API usually returns data in response.data.message or response.data.data
-   //console.log(response);
-    
     return response.data.message || response.data.data || [];
   } catch (error: any) {
     console.error("Error fetching visit plans:", error.response?.data || error.message);
@@ -96,7 +101,6 @@ export const getVisitPlans = async (salesName: string): Promise<VisitPlan[]> => 
 
 export const updateVisitPlanStatus = async (name: string, newStatus: 'Checked In' | 'Completed', data?: { latitude?: number, longitude?: number, photo_url?: string }): Promise<boolean> => {
   try {
-    const csrfToken = await getCsrfToken(); // Get CSRF token if needed
     const payload: any = {
       name: name,
       new_status: newStatus,
@@ -107,20 +111,14 @@ export const updateVisitPlanStatus = async (name: string, newStatus: 'Checked In
       payload.photo_url = data.photo_url;
     }
 
-    // Assuming a custom Frappe method to update visit plan status
-    const response = await api.post('/api/method/sales_monitor.api.update_sales_visit_plan_status', payload, {
-      headers: {
-        'X-Frappe-CSRF-Token': csrfToken || '', // Include CSRF token if available
-      },
-    });
-    return response.data.message === 'Success'; // Adjust based on your Frappe method's return
+    const response = await api.post('/api/method/sales_monitor.api.update_sales_visit_plan_status', payload);
+    return response.data.message === 'Success';
   } catch (error: any) {
     console.error("Error updating visit plan status:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to update visit plan status.');
   }
 };
 
-// Placeholder for getting order history
 export const getEmployeeId = async (userId: string): Promise<string | null> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_employee_id', {
@@ -135,7 +133,6 @@ export const getEmployeeId = async (userId: string): Promise<string | null> => {
 
 export const getOrderHistory = async (storeName: string): Promise<any[]> => {
   try {
-    // Assuming a custom Frappe method to get order history for a store
     const response = await api.get('/api/method/sales_monitor.api.get_order_history', {
       params: { store_name: storeName },
     });
@@ -143,33 +140,6 @@ export const getOrderHistory = async (storeName: string): Promise<any[]> => {
   } catch (error: any) {
     console.error("Error fetching order history:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to fetch order history.');
-  }
-};
-
-interface SalesActivity {
-  Date: string;
-  Customer: string;
-  Checkin: string;
-  Checkout: string;
-  Duration: number;
-  Status: string;
-}
-
-export const getSalesActivityHistory = async (salesPerson: string, fromDate?: string, toDate?: string, customer?: string): Promise<SalesActivity[]> => {
-  try {
-    const params: any = { sales_person: salesPerson };
-    if (fromDate) params.from_date = fromDate;
-    if (toDate) params.to_date = toDate;
-    if (customer) params.customer = customer;
-
-    const response = await api.get('/api/method/sales_monitor.api.get_sales_activity_history', {
-      params: params,   
-    });
-    console.log(response)
-    return response.data.message || [];
-  } catch (error: any) {
-    //console.error("Error fetching sales activity history:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch sales activity history.');
   }
 };
 

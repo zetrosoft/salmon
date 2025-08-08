@@ -1,6 +1,6 @@
 import { AppBar, Toolbar, Typography, Container, List, ListItem, ListItemText, Paper, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton } from '@mui/material';
 import { useState, useEffect, useRef } from 'react';
-import { getVisitPlans, updateVisitPlanStatus, getOrderHistory, getEmployeeId, getSalesActivityHistory } from '../api/frappeApi'; // Changed from mockApi
+import { getVisitPlans, updateVisitPlanStatus } from '../api/frappeApi';
 import { useNavigate } from 'react-router-dom';
 import HistoryIcon from '@mui/icons-material/History';
 import ScheduleIcon from '@mui/icons-material/Schedule'; // For Terjadwal
@@ -15,6 +15,7 @@ interface VisitPlan {
   store_name: string; // Changed from storeName
   address: string;
   status: 'Draft' | 'Planned' | 'Checked In' | 'Completed' | 'Canceled';
+  planned_visit_time?: string; // Added planned_visit_time
   checkin_time?: string; // Changed from checkinTime
   checkout_time?: string; // Changed from checkoutTime
   latitude?: number; // Changed from lat
@@ -24,11 +25,10 @@ interface VisitPlan {
 
 interface VisitListPageProps {
   onLogout: () => void;
-  userId: string | null;
-  employeeId: string | null;
+  employeeId: string | null; // Removed userId
 }
 
-const VisitListPage = ({ onLogout, userId, employeeId }: VisitListPageProps) => {
+const VisitListPage = ({ onLogout, employeeId }: VisitListPageProps) => {
   const navigate = useNavigate();
   const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
   const [loading, setLoading] = useState(true);
