@@ -21,7 +21,9 @@ delete api.defaults.headers.common['Expect'];
 
 // Add a request interceptor to include the CSRF token for all state-changing requests
 api.interceptors.request.use(config => {
-  if (config.method === 'post' || config.method === 'put' || config.method === 'delete') {
+  // Only add CSRF token for non-login POST/PUT/DELETE requests
+  if ((config.method === 'post' || config.method === 'put' || config.method === 'delete') &&
+      config.url !== '/api/method/sales_monitor.api.pwa_login') {
     const csrfToken = sessionStorage.getItem('frappe_csrf_token'); // Get from sessionStorage
     if (csrfToken) {
       config.headers['X-Frappe-CSRF-Token'] = csrfToken;
@@ -64,8 +66,15 @@ export const login = async (username: string, password: string): Promise<LoginRe
 
     if (responseData.status === 'success') {
       // Store the SID (which acts as CSRF token) in session storage
-      if (responseData.sid) {
-          sessionStorage.setItem('frappe_csrf_token', responseData.sid);
+      // if (responseData.sid) {
+      //     sessionStorage.setItem('frappe_csrf_token', responseData.sid);
+      // }
+
+      // After successful login, Frappe sets a `csrf_token` cookie.
+      // We need to extract it and store it for subsequent requests.
+      const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
+      if (csrfToken) {
+        sessionStorage.setItem('frappe_csrf_token', csrfToken.split('=')[1]);
       }
       return {
         success: true,
