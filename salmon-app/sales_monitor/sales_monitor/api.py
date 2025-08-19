@@ -94,8 +94,7 @@ def get_sales_visit_plans(sales_name, date):
                 "address",
                 "status",
                 "visit_time as planned_visit_time",
-                "notes",
-                "sales_activity_log"
+                "notes"
             ],
             ignore_permissions=True
         )

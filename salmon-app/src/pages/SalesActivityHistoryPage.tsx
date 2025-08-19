@@ -1,7 +1,8 @@
 import { AppBar, Toolbar, Typography, Container, Box, CircularProgress, Alert, IconButton, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { getSalesActivityHistory } from '../api/frappeApi';
 
 interface SalesActivity {
   Date: string;
@@ -12,8 +13,13 @@ interface SalesActivity {
   Status: string;
 }
 
+interface OutletContext {
+  employeeId: string | null;
+}
+
 const SalesActivityHistoryPage = () => {
-  const { employeeId, customer: initialCustomer } = useParams<{ employeeId: string; customer?: string }>();
+  const { employeeId } = useOutletContext<OutletContext>();
+  const { customer: initialCustomer } = useParams<{ customer?: string }>();
   const navigate = useNavigate();
 
   const [activities, setActivities] = useState<SalesActivity[]>([]);
@@ -42,8 +48,8 @@ const SalesActivityHistoryPage = () => {
       setLoading(true);
       setError(null);
       try {
-        // const history = await getSalesActivityHistory(employeeId, fromDate, toDate, customerFilter); // Removed call
-        // setActivities(history);
+        const history = await getSalesActivityHistory(fromDate, toDate, customerFilter);
+        setActivities(history);
       } catch (err: any) {
         setError(err.message || 'Failed to fetch sales activity history.');
       } finally {
@@ -53,9 +59,7 @@ const SalesActivityHistoryPage = () => {
     fetchHistory();
   }, [employeeId, fromDate, toDate, customerFilter]);
 
-  const handleBack = () => {
-    navigate(-1); // Go back to the previous page
-  };
+  
 
   if (loading) {
     return (
@@ -74,24 +78,7 @@ const SalesActivityHistoryPage = () => {
   }
 
   return (
-    <Box sx={{ flexGrow: 1, width: '100%' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <IconButton
-            edge="start"
-            color="inherit"
-            aria-label="back"
-            onClick={handleBack}
-            sx={{ mr: 2 }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Sales Activity History
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      <Container maxWidth="md" sx={{ mt: 4 }}>
+    <Container maxWidth="md" sx={{ mt: 4 }}>
         <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <TextField
             label="From Date"
@@ -157,7 +144,6 @@ const SalesActivityHistoryPage = () => {
           </TableContainer>
         )}
       </Container>
-    </Box>
   );
 };
 
