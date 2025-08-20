@@ -98,6 +98,14 @@ const DashboardPage = () => {
     );
   }
 
+  if (!dashboardData) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <Typography>No data available.</Typography>
+      </Box>
+    );
+  }
+
   // Doughnut chart data for Percentage Achievement
   const achievementData = {
     labels: ['Achieved', 'Remaining'],
