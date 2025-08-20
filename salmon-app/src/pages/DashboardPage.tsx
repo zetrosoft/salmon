@@ -47,9 +47,32 @@ const DashboardPage = () => {
           getWeeklyVisitSalesComparisonData(),
           getWeeklyCustomerOrderData(),
         ]);
-        setDashboardData(dashData);
-        setWeeklyVisitSalesComparisonData(visitSalesData);
-        setWeeklyCustomerOrderData(customerOrderData);
+
+        // Default data for the main dashboard stats
+        const defaultDashData: DashboardData = {
+          total_visits_today: 0,
+          pending_visits: 0,
+          completed_visits_today: 0,
+          total_sales_month: 0,
+          total_outstanding_sales: 0,
+          achievement_percentage: 0,
+        };
+
+        // Default data for the weekly comparison chart
+        const defaultVisitSalesData: WeeklyVisitSalesComparisonData = {
+          labels: [],
+          datasets: [],
+        };
+
+        // Default data for the weekly customer order grid
+        const defaultCustomerOrderData: WeeklyCustomerOrderData = {
+          data: [],
+        };
+
+        setDashboardData(dashData && dashData.total_visits_today !== undefined ? dashData : defaultDashData);
+        setWeeklyVisitSalesComparisonData(visitSalesData && visitSalesData.labels ? visitSalesData : defaultVisitSalesData);
+        setWeeklyCustomerOrderData(customerOrderData && customerOrderData.data ? customerOrderData : defaultCustomerOrderData);
+
       } catch (err: any) {
         setError(err.message || 'Failed to fetch dashboard data.');
       } finally {
@@ -80,7 +103,7 @@ const DashboardPage = () => {
     labels: ['Achieved', 'Remaining'],
     datasets: [
       {
-        data: [dashboardData?.achievement_percentage ?? 0, 100 - (dashboardData?.achievement_percentage ?? 0)],
+        data: [dashboardData.achievement_percentage, 100 - dashboardData.achievement_percentage],
         backgroundColor: ['#4CAF50', '#E0E0E0'],
         hoverBackgroundColor: ['#4CAF50', '#E0E0E0'],
       },
@@ -104,7 +127,7 @@ const DashboardPage = () => {
             />
             <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
               <Typography variant="h2" component="div" fontWeight="bold">
-                {dashboardData?.total_visits_today ?? 0}
+                {dashboardData.total_visits_today}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 (Klik untuk detail jadwal)
@@ -124,7 +147,7 @@ const DashboardPage = () => {
             />
             <CardContent sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               <Typography variant="h2" component="div" fontWeight="bold">
-                {dashboardData?.pending_visits ?? 0}
+                {dashboardData.pending_visits}
               </Typography>
             </CardContent>
           </Card>
@@ -144,7 +167,7 @@ const DashboardPage = () => {
                 <Doughnut data={achievementData} options={{ responsive: true, maintainAspectRatio: false }} />
               </Box>
               <Typography variant="h5" component="div" fontWeight="bold" sx={{ mt: 2 }}>
-                {dashboardData?.achievement_percentage?.toFixed(2) ?? 0}%
+                {dashboardData.achievement_percentage.toFixed(2)}%
               </Typography>
             </CardContent>
           </Card>

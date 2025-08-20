@@ -4,6 +4,7 @@ import { getVisitPlans, submitVisitUpdate } from '../api/frappeApi';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import HistoryIcon from '@mui/icons-material/History';
 import StorefrontIcon from '@mui/icons-material/Storefront';
+import PlaylistAdd from '@mui/icons-material/PlaylistAdd';
 
 interface VisitPlan {
   name: string;
@@ -240,11 +241,24 @@ const VisitSchedulePage = () => {
 
   return (
     <>
-      <Container sx={{ mt: 4, alignSelf: 'flex-start' }}>
+      <Container sx={{ mt: 0, alignSelf: 'flex-start' }}>
         {visitPlans.length === 0 ? (
-          <Typography variant="subtitle1" sx={{ textAlign: 'center', mt: 4 }}>
-            Tidak ada rencana kunjungan hari ini.
-          </Typography>
+          <Box sx={{ textAlign: 'top', mt:1 , p: 3, border: '2px dashed', borderColor: 'grey.300', borderRadius: 2 }}>
+            <PlaylistAdd sx={{ fontSize: 60, color: 'grey.400' }} />
+            <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary', fontWeight: 'bold' }}>
+              Tidak Ada Rencana Kunjungan
+            </Typography>
+            <Typography variant="body1" sx={{ mt: 1, color: 'text.secondary' }}>
+              Jadwal untuk hari ini masih kosong.
+            </Typography>
+            <Button
+              variant="contained"
+              sx={{ mt: 3 }}
+              onClick={() => navigate('/input-visit')} // Asumsi rute ini benar
+            >
+              Buat Kunjungan Baru
+            </Button>
+          </Box>
         ) : (
           <Box sx={{ width: '100%' }}>
             {visitPlans.map((plan) => (

@@ -1,8 +1,8 @@
 
 import axios from 'axios';
 
-//const API_BASE_URL = 'http://35.219.54.8:8882';
-const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
+const API_BASE_URL = 'http://35.219.54.8:8882';
+// const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
 
 /*
 // --- HARDCODED API KEY & SECRET (FOR DEVELOPMENT ONLY) ---
@@ -110,6 +110,19 @@ export const getVisitPlans = async (): Promise<VisitPlan[]> => {
     });
     return response.data.message || response.data.data || [];
   } catch (error: any) {
+    // Periksa apakah ini error dari Axios dengan respons dari server
+    if (axios.isAxiosError(error) && error.response) {
+      // Untuk error 4xx (client error), catat sebagai peringatan dan kembalikan array kosong.
+      // Ini akan menangani error seperti "not found" atau "validation" sebagai daftar kosong, mencegah crash.
+      if (error.response.status >= 400 && error.response.status < 500) {
+        console.warn(
+          `Client error (${error.response.status}) saat mengambil data visit plans. Mengembalikan array kosong.`,
+          error.response.data
+        );
+        return []; // Kembalikan array kosong untuk client error
+      }
+    }
+    // Untuk semua error lain (5xx server error, masalah jaringan, dll.), catat dan lempar kembali.
     console.error("Error fetching visit plans:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to fetch visit plans.');
   }
@@ -164,6 +177,12 @@ export const getOrderHistory = async (storeName: string): Promise<any[]> => {
     });
     return response.data.message || response.data.data || [];
   } catch (error: any) {
+    if (axios.isAxiosError(error) && error.response) {
+      if (error.response.status >= 400 && error.response.status < 500) {
+        console.warn(`Client error (${error.response.status}) fetching order history. Returning empty array.`, error.response.data);
+        return [];
+      }
+    }
     console.error("Error fetching order history:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to fetch order history.');
   }
@@ -179,6 +198,12 @@ export const getSalesActivityHistory = async (fromDate?: string, toDate?: string
     const response = await api.get('/api/method/sales_monitor.api.get_sales_activity_history', { params });
     return response.data.message || response.data.data || [];
   } catch (error: any) {
+    if (axios.isAxiosError(error) && error.response) {
+      if (error.response.status >= 400 && error.response.status < 500) {
+        console.warn(`Client error (${error.response.status}) fetching sales activity history. Returning empty array.`, error.response.data);
+        return [];
+      }
+    }
     console.error("Error fetching sales activity history:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to fetch sales activity history.');
   }

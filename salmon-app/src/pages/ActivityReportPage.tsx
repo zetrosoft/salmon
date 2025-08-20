@@ -70,11 +70,11 @@ const ActivityReportPage = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
+    <Container maxWidth="lg" sx={{ mt: 2 }}>
       <Typography variant="h4" component="h1" gutterBottom>
         Activity Report
       </Typography>
-      <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+      <Box sx={{ mb: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <TextField
           label="From Date"
           type="date"
