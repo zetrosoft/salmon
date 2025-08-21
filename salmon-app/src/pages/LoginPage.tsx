@@ -1,6 +1,6 @@
 import { Box, Button, Container, TextField, Typography, Paper, CircularProgress, Alert } from '@mui/material';
 import { useState } from 'react';
-import { login } from '../api/frappeApi';
+import { login, fetchCsrfToken } from '../api/frappeApi';
 
 interface LoginPageProps {
   onLoginSuccess: (userId: string, employeeId: string) => void;
@@ -18,6 +18,9 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
     setError(null);
 
     try {
+      // Fetch CSRF token before attempting login
+      await fetchCsrfToken();
+
       const response = await login(username, password);
       if (response.success && response.userId && response.salesName) {
         onLoginSuccess(response.userId, response.salesName);

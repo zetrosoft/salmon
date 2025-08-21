@@ -1,8 +1,8 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = 'http://35.219.54.8:8882';
-// const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
+//const API_BASE_URL = 'http://35.219.54.8:8882';
+ const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
 
 /*
 // --- HARDCODED API KEY & SECRET (FOR DEVELOPMENT ONLY) ---
@@ -76,6 +76,7 @@ export const login = async (username: string, password: string): Promise<LoginRe
       if (csrfToken) {
         sessionStorage.setItem('frappe_csrf_token', csrfToken.split('=')[1]);
       }
+      sessionStorage.setItem('frappe_user_id', responseData.user_id);
       return {
         success: true,
         salesName: responseData.employee_id, // Assuming employee_id is the salesName
@@ -249,3 +250,68 @@ export const logout = async (): Promise<boolean> => {
     return false;
   }
 };
+
+export const getCustomers = async (): Promise<string[]> => {
+  try {
+    const response = await api.get('/api/method/frappe.client.get_list', {
+      params: {
+        doctype: 'Customer',
+        fields: JSON.stringify(['name']),
+        limit_page_length: 9999,
+      },
+    });
+    return response.data.message.map((d: any) => d.name) || [];
+  } catch (error: any) {
+    console.error("Error fetching customers:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch customers.');
+  }
+};
+
+export const getCustomerAddress = async (customerName: string): Promise<string | null> => {
+  try {
+    const response = await api.get('/api/method/frappe.client.get_value', {
+      params: {
+        doctype: 'Customer',
+        fieldname: 'primary_address',
+        filters: JSON.stringify({ name: customerName }),
+      },
+    });
+    return response.data.message?.primary_address || null;
+  } catch (error: any) {
+    console.error("Error fetching customer address:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch customer address.');
+  }
+};
+
+export const createSalesVisitPlan = async (salesVisitPlanData: any): Promise<any> => {
+  try {
+    const response = await api.post('/api/method/sales_monitor.api.create_sales_visit_plan', {
+      sales_visit_plan_data: salesVisitPlanData,
+    });
+    return response.data.message;
+  } catch (error: any) {
+    console.error("Error creating sales visit plan:", error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to create sales visit plan.');
+  }
+};
+
+export const fetchCsrfToken = async (): Promise<string | null> => {
+  try {
+    // Make a simple GET request to get the csrf_token cookie
+    // Frappe usually sets this cookie on any page load from the Frappe domain
+    await api.get('/'); // Or any other simple Frappe endpoint that sets cookies
+
+    const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
+    if (csrfToken) {
+      const token = csrfToken.split('=')[1];
+      sessionStorage.setItem('frappe_csrf_token', token);
+      return token;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching CSRF token:", error);
+    return null;
+  }
+};
+
+
