@@ -213,8 +213,10 @@ export const getSalesActivityHistory = async (fromDate?: string, toDate?: string
 export const getDashboardData = async (): Promise<any> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_dashboard_data');
-    return response.data.message || response.data.data;
-    console.log(response.data.message)
+    const dataToReturn = response.data.message || response.data.data;
+    console.log("getDashboardData - Raw response.data:", response.data);
+    console.log("getDashboardData - Data to return:", dataToReturn);
+    return dataToReturn;
   } catch (error: any) {
     console.error("Error fetching dashboard data:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to fetch dashboard data.');

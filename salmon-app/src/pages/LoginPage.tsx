@@ -25,12 +25,15 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
       if (response.success && response.userId && response.salesName) {
         onLoginSuccess(response.userId, response.salesName);
       } else {
-        const errorMessage = typeof response.message === 'string' ? response.message : 'Login failed';
-        setError(errorMessage);
+        const backendMessage = typeof response.message === 'string' ? response.message : '';
+        if (backendMessage === 'Invalid login credentials.') {
+          setError('Invalid username or password.');
+        } else {
+          setError(backendMessage || 'Login failed');
+        }
       }
     } catch (err: any) {
-      const errorMessage = typeof err.message === 'string' ? err.message : 'An unexpected error occurred.';
-      setError(errorMessage);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
