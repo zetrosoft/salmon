@@ -1,8 +1,8 @@
 
 import axios from 'axios';
 
-//const API_BASE_URL = 'http://35.219.54.8:8882';
- const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
+const API_BASE_URL = 'http://35.219.54.8:8882';
+//const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
 
 /*
 // --- HARDCODED API KEY & SECRET (FOR DEVELOPMENT ONLY) ---
