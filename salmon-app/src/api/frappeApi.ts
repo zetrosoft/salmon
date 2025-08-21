@@ -214,8 +214,6 @@ export const getDashboardData = async (): Promise<any> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_dashboard_data');
     const dataToReturn = response.data.message || response.data.data;
-    console.log("getDashboardData - Raw response.data:", response.data);
-    console.log("getDashboardData - Data to return:", dataToReturn);
     return dataToReturn;
   } catch (error: any) {
     console.error("Error fetching dashboard data:", error.response?.data || error.message);

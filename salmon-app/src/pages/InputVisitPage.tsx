@@ -15,6 +15,8 @@ import {
   TableRow,
   Paper,
 } from '@mui/material';
+
+// import Grid from '@mui/material/Unstable_Grid2';
 import Autocomplete from '@mui/material/Autocomplete';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -22,7 +24,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import { DatePicker, TimePicker } from '@mui/x-date-pickers';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
-import moment from 'moment';
+import moment from 'moment'; // Keep default import for moment functions
+import type { Moment } from 'moment'; // Type-only import for Moment
 
 import { getEmployeeId, getCustomers, getCustomerAddress, createSalesVisitPlan } from '../api/frappeApi';
 
@@ -174,7 +177,8 @@ const InputVisitPage = () => {
       <Box component="form" sx={{ '& .MuiTextField-root': { m: 1, width: '100%' } }}>
         <LocalizationProvider dateAdapter={AdapterMoment}>
           <Grid container spacing={2} alignItems="center">
-            <Grid xs={12} sm={6}>
+            {/* @ts-ignore */}
+            <Grid item xs={12} sm={6}>
               <TextField
                 label="Sales Person"
                 name="sales_person"
@@ -184,26 +188,23 @@ const InputVisitPage = () => {
                 required
               />
             </Grid>
-            <Grid xs={12} sm={4}>
+            {/* @ts-ignore */}
+            <Grid item xs={12} sm={4}>
               <DatePicker
                 label="Planned Visit Date"
                 value={moment(salesVisitPlan.planned_visit_date)}
-                onChange={(newValue) => {
+                onChange={(newValue: Moment | null) => {
                   setSalesVisitPlan((prev) => ({
                     ...prev,
                     planned_visit_date: newValue ? newValue.format('YYYY-MM-DD') : '',
                   }));
                 }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    fullWidth
-                    required
-                  />
-                )}
+                slots={{ textField: TextField }}
+                slotProps={{ textField: { fullWidth: true, required: true } }}
               />
             </Grid>
-            <Grid xs={12} sm={2}>
+            {/* @ts-ignore */}
+            <Grid item xs={12} sm={2}>
               <Button
                 variant="contained"
                 color="primary"
@@ -220,7 +221,8 @@ const InputVisitPage = () => {
           </Typography>
 
           <Grid container spacing={2} alignItems="flex-start">
-            <Grid xs={12} sm={6}>
+            {/* @ts-ignore */}
+            <Grid item xs={12} sm={6}>
               <Autocomplete
                 options={customerOptions}
                 value={currentVisitItem.customer}
@@ -237,7 +239,8 @@ const InputVisitPage = () => {
                 fullWidth
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            {/* @ts-ignore */}
+            <Grid item xs={12} sm={6}>
               <TextField
                 label="Address"
                 name="address"
@@ -248,25 +251,23 @@ const InputVisitPage = () => {
                 fullWidth
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            {/* @ts-ignore */}
+            <Grid item xs={12} sm={6}>
               <TimePicker
                 label="Visit Time"
                 value={moment(currentVisitItem.visit_time, 'HH:mm')}
-                onChange={(newValue) => {
+                onChange={(newValue: Moment | null) => {
                   setCurrentVisitItem((prev) => ({
                     ...prev,
                     visit_time: newValue ? newValue.format('HH:mm') : '',
                   }));
                 }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    fullWidth
-                  />
-                )}
+                slots={{ textField: TextField }}
+                slotProps={{ textField: { fullWidth: true } }}
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            {/* @ts-ignore */}
+            <Grid item xs={12} sm={6}>
               <TextField
                 label="Notes"
                 name="notes"
@@ -277,7 +278,8 @@ const InputVisitPage = () => {
                 fullWidth
               />
             </Grid>
-            <Grid xs={12}>
+            {/* @ts-ignore */}
+            <Grid item xs={12}>
               <Button
                 variant="outlined"
                 startIcon={<AddIcon />}

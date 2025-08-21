@@ -1,16 +1,18 @@
-import { ThemeProvider, CssBaseline } from '@mui/material';
-import theme from './theme';
-import LoginPage from './pages/LoginPage';
-import VisitSchedulePage from './pages/VisitSchedulePage';
-import SalesActivityHistoryPage from './pages/SalesActivityHistoryPage';
-import DashboardPage from './pages/DashboardPage'; // New
-import ActivityReportPage from './pages/ActivityReportPage'; // New
-import ProfilePage from './pages/ProfilePage'; // New
-import InputVisitPage from './pages/InputVisitPage';
-import Layout from './components/Layout'; // New
-import { useState, useCallback, useEffect } from 'react';
+import { ThemeProvider, CssBaseline } from '@mui/material'; // Re-added import
+import theme from './theme'; // Re-added import
+import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react'; // Added lazy, Suspense
 import { logout } from './api/frappeApi';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './components/Layout'; // New
+
+// Lazy-loaded components
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const VisitSchedulePage = lazy(() => import('./pages/VisitSchedulePage'));
+const SalesActivityHistoryPage = lazy(() => import('./pages/SalesActivityHistoryPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ActivityReportPage = lazy(() => import('./pages/ActivityReportPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const InputVisitPage = lazy(() => import('./pages/InputVisitPage'));
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -45,23 +47,25 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Routes>
-          <Route path="/login" element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />} />
-          {isLoggedIn ? (
-            <Route path="/" element={<Layout onLogout={handleLogout} employeeId={employeeId} />}>
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="schedule" element={<VisitSchedulePage />} />
-              <Route path="activity" element={<SalesActivityHistoryPage />} />
-              <Route path="report" element={<ActivityReportPage />} />
-              <Route path="profile" element={<ProfilePage />} />
-              <Route path="input-visit" element={<InputVisitPage />} />
-              <Route path="history/:customer?" element={<SalesActivityHistoryPage />} />
-            </Route>
-          ) : (
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          )}
-        </Routes>
+        <Suspense fallback={<div>Loading Application...</div>}> {/* Added Suspense */}
+          <Routes>
+            <Route path="/login" element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />} />
+            {isLoggedIn ? (
+              <Route path="/" element={<Layout onLogout={handleLogout} employeeId={employeeId} />}>
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="schedule" element={<VisitSchedulePage />} />
+                <Route path="activity" element={<SalesActivityHistoryPage />} />
+                <Route path="report" element={<ActivityReportPage />} />
+                <Route path="profile" element={<ProfilePage />} />
+                <Route path="input-visit" element={<InputVisitPage />} />
+                <Route path="history/:customer?" element={<SalesActivityHistoryPage />} />
+              </Route>
+            ) : (
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            )}
+          </Routes>
+        </Suspense> {/* Closed Suspense */}
       </Router>
     </ThemeProvider>
   );
