@@ -1,52 +1,49 @@
-
 import axios from 'axios';
+import type { AxiosInstance } from 'axios';
 
-const API_BASE_URL = 'http://35.219.54.8:8882';
-//const API_BASE_URL = 'http://localhost:8080'; // Your Frappe instance URL
+let api: AxiosInstance;
 
-/*
-// --- HARDCODED API KEY & SECRET (FOR DEVELOPMENT ONLY) ---
-const HARDCODED_API_KEY = '691dc30ced24013';//'2b7d7c65471aecf';
-const HARDCODED_API_SECRET = 'c4c52d2694638d1';// '2fa510cb40c011b';
-// ----------------------------------------------------------
-*/
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true, // Still needed for initial session login
-});
-
-// Remove the Expect header to prevent 417 errors with some servers/proxies
-delete api.defaults.headers.common['Expect'];
-
-// Add a request interceptor to include the CSRF token for all state-changing requests
-api.interceptors.request.use(config => {
-  // Only add CSRF token for non-login POST/PUT/DELETE requests
-  if ((config.method === 'post' || config.method === 'put' || config.method === 'delete') &&
-      config.url !== '/api/method/sales_monitor.api.pwa_login') {
-    const csrfToken = sessionStorage.getItem('frappe_csrf_token'); // Get from sessionStorage
-    if (csrfToken) {
-      config.headers['X-Frappe-CSRF-Token'] = csrfToken;
+export const initializeApi = async () => {
+  try {
+    const response = await fetch('./setup.json');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-  }
-  return config;
-}, error => {
-  return Promise.reject(error);
-});
+    const config = await response.json();
+    const API_BASE_URL = config.API_BASE_URL;
 
-/*
-// Add a request interceptor to include the Authorization header for all requests
-api.interceptors.request.use(config => {
-  // Only add Authorization header if it's not the initial login request
-  // and if hardcoded keys are available
-  if (config.url !== '/api/method/login' && HARDCODED_API_KEY && HARDCODED_API_SECRET) {
-    config.headers.Authorization = `token ${HARDCODED_API_KEY}:${HARDCODED_API_SECRET}`;
+    api = axios.create({
+        baseURL: API_BASE_URL,
+        withCredentials: true,
+    });
+  } catch (error) {
+    console.error("Could not load setup.json. Using default API URL.", error);
+    api = axios.create({
+        baseURL: 'http://35.219.54.8:8882', // Fallback URL
+        withCredentials: true,
+    });
   }
-  return config;
-}, error => {
-  return Promise.reject(error);
-});
-*/
+
+  // Remove the Expect header to prevent 417 errors with some servers/proxies
+  delete api.defaults.headers.common['Expect'];
+
+  // Add a request interceptor to include the CSRF token for all state-changing requests
+  api.interceptors.request.use(config => {
+    // Only add CSRF token for non-login POST/PUT/DELETE requests
+    if ((config.method === 'post' || config.method === 'put' || config.method === 'delete') &&
+        config.url !== '/api/method/sales_monitor.api.pwa_login') {
+      const csrfToken = sessionStorage.getItem('frappe_csrf_token'); // Get from sessionStorage
+        console.log('CSRF Token from sessionStorage:', csrfToken);
+      if (csrfToken) {
+        config.headers['X-Frappe-CSRF-Token'] = csrfToken;
+      }
+    }
+    return config;
+  }, error => {
+    return Promise.reject(error);
+  });
+};
+
 
 interface LoginResponse {
   success: boolean;
@@ -65,13 +62,6 @@ export const login = async (username: string, password: string): Promise<LoginRe
     const responseData = response.data.message;
 
     if (responseData.status === 'success') {
-      // Store the SID (which acts as CSRF token) in session storage
-      // if (responseData.sid) {
-      //     sessionStorage.setItem('frappe_csrf_token', responseData.sid);
-      // }
-
-      // After successful login, Frappe sets a `csrf_token` cookie.
-      // We need to extract it and store it for subsequent requests.
       const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
       if (csrfToken) {
         sessionStorage.setItem('frappe_csrf_token', csrfToken.split('=')[1]);
@@ -92,38 +82,42 @@ export const login = async (username: string, password: string): Promise<LoginRe
 };
 
 interface VisitPlan {
-  name: string; // Frappe DocType name (e.g., 'SVP0001')
+  name: string; 
+  parent: string;
   store_name: string;
   address: string;
   status: 'Draft' | 'Planned' | 'Checked In' | 'Completed' | 'Canceled';
+  parent_docstatus: number; 
   planned_visit_time?: string;
   checkin_time?: string;
   checkout_time?: string;
   latitude?: number;
   longitude?: number;
   photo_url?: string | null;
+  notes?: string;
 }
 
-export const getVisitPlans = async (): Promise<VisitPlan[]> => {
+export const PAGE_LENGTH = 5;
+export const getVisitPlans = async (page: number): Promise<VisitPlan[]> => { 
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_sales_visit_plans', {
-      params: { date: new Date().toISOString().split('T')[0] },
+      params: { 
+        date: new Date().toISOString().split('T')[0],
+        limit_start: page * PAGE_LENGTH,
+        limit_page_length: PAGE_LENGTH,
+      },
     });
     return response.data.message || response.data.data || [];
   } catch (error: any) {
-    // Periksa apakah ini error dari Axios dengan respons dari server
     if (axios.isAxiosError(error) && error.response) {
-      // Untuk error 4xx (client error), catat sebagai peringatan dan kembalikan array kosong.
-      // Ini akan menangani error seperti "not found" atau "validation" sebagai daftar kosong, mencegah crash.
       if (error.response.status >= 400 && error.response.status < 500) {
         console.warn(
           `Client error (${error.response.status}) saat mengambil data visit plans. Mengembalikan array kosong.`,
           error.response.data
         );
-        return []; // Kembalikan array kosong untuk client error
+        return []; 
       }
     }
-    // Untuk semua error lain (5xx server error, masalah jaringan, dll.), catat dan lempar kembali.
     console.error("Error fetching visit plans:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to fetch visit plans.');
   }
@@ -139,20 +133,19 @@ export const submitVisitUpdate = async (name: string, newStatus: 'Checked In' | 
       if (data.latitude !== undefined) formData.append('latitude', data.latitude.toString());
       if (data.longitude !== undefined) formData.append('longitude', data.longitude.toString());
       if (data.photo_file) {
-        formData.append('photo', data.photo_file); // 'photo' adalah nama input file yang diharapkan backend
+        formData.append('photo', data.photo_file); 
       }
     }
 
-    // Kirim FormData sebagai body permintaan POST
     const response = await api.post('/api/method/sales_monitor.api.submit_visit_update', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    console.log("submitVisitUpdate response:", response.data); // ADDED LOG
-    const success = response.data.message.status === 'success'; // FIX APPLIED HERE
-    console.log("submitVisitUpdate success boolean:", success); // ADDED LOG
-    return success; // Return the boolean
+    console.log("submitVisitUpdate response:", response.data); 
+    const success = response.data.message.status === 'success'; 
+    console.log("submitVisitUpdate success boolean:", success); 
+    return success; 
   } catch (error: any) {
     console.error("Error submitting visit update:", error.response?.data || error.message);
     throw new Error(error.response?.data?.message || 'Failed to submit visit update.');
@@ -251,13 +244,16 @@ export const logout = async (): Promise<boolean> => {
   }
 };
 
-export const getCustomers = async (): Promise<string[]> => {
+export const getCustomers = async (searchText: string = '', page: number = 0): Promise<string[]> => {
+  const PAGE_LENGTH = 20;
   try {
     const response = await api.get('/api/method/frappe.client.get_list', {
       params: {
         doctype: 'Customer',
         fields: JSON.stringify(['name']),
-        limit_page_length: 9999,
+        filters: searchText ? JSON.stringify([['name', 'like', `%${searchText}%`]]) : JSON.stringify([['name', 'like', '%%']]),
+        limit_start: page * PAGE_LENGTH,
+        limit_page_length: PAGE_LENGTH,
       },
     });
     return response.data.message.map((d: any) => d.name) || [];
@@ -297,9 +293,7 @@ export const createSalesVisitPlan = async (salesVisitPlanData: any): Promise<any
 
 export const fetchCsrfToken = async (): Promise<string | null> => {
   try {
-    // Make a simple GET request to get the csrf_token cookie
-    // Frappe usually sets this cookie on any page load from the Frappe domain
-    await api.get('/'); // Or any other simple Frappe endpoint that sets cookies
+    await api.get('/'); 
 
     const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
     if (csrfToken) {
@@ -313,5 +307,3 @@ export const fetchCsrfToken = async (): Promise<string | null> => {
     return null;
   }
 };
-
-

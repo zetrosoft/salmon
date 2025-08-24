@@ -1,4 +1,5 @@
-import { AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItemButton, ListItemText, Box, CssBaseline, Breadcrumbs, Link as MuiLink, Divider } from '@mui/material';
+
+import { AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItemButton, ListItemText, Box, CssBaseline, Breadcrumbs, Link as MuiLink, Divider, CircularProgress } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import HomeIcon from '@mui/icons-material/Home';
@@ -7,7 +8,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import PersonIcon from '@mui/icons-material/Person';
 import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt';
-import { useState } from 'react';
+import { useState, Suspense, useRef } from 'react'; // Import useRef
 import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
 
 interface LayoutProps {
@@ -31,13 +32,20 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const pathnames = location.pathname.split('/').filter((x) => x);
+  const menuButtonRef = useRef<HTMLButtonElement>(null); // Ref for the menu button
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
+  const handleDrawerClose = () => {
+    setMobileOpen(false);
+    // Return focus to the menu button when the drawer closes
+    menuButtonRef.current?.focus();
+  };
+
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
+    <Box onClick={handleDrawerClose} sx={{ textAlign: 'center' }}>
       <Box sx={{ my: 2 }}>
         <img src="logo-siumang@0.33x.svg" alt="Si Umang Logo" style={{ maxHeight: '50px' }} />
       </Box>
@@ -75,12 +83,19 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
     </Box>
   );
 
+  const PageLoader = () => (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 64px)' }}>
+      <CircularProgress />
+    </Box>
+  );
+
   return (
     <Box sx={{ display: 'flex', width: '100%' }}>
       <CssBaseline />
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <IconButton
+            ref={menuButtonRef} // Assign ref to the button
             color="inherit"
             aria-label="open drawer"
             edge="start"
@@ -116,8 +131,8 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
                 </Breadcrumbs>
             </Box>
           </Box>
-          <Typography sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>
-            Hi, {employeeId}
+          <Typography sx={{ mr: 2, display: { xs: 'none', sm: 'block' }, minHeight: '24px' }}>
+            {employeeId ? `Hi, ${employeeId}` : ''}
           </Typography>
           <IconButton color="inherit" onClick={onLogout} title="Log Out">
             <LogoutIcon />
@@ -132,10 +147,7 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
         <Drawer
           variant="temporary"
           open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
+          onClose={handleDrawerClose} // Use the new handler
           sx={{
             display: { xs: 'block', sm: 'none' },
             '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
@@ -159,7 +171,9 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
         sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${drawerWidth}px)` } }}
       >
         <Toolbar /> {/* This is to offset the AppBar */}
-        <Outlet context={{ employeeId }} /> {/* Render child routes here */}
+        <Suspense fallback={<PageLoader />}>
+          <Outlet context={{ employeeId }} /> {/* Render child routes here */}
+        </Suspense>
       </Box>
     </Box>
   );

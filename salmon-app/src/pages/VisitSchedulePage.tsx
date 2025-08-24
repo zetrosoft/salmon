@@ -1,16 +1,30 @@
-import { Typography, Container, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton, Card, CardHeader, CardContent, CardActions, Chip } from '@mui/material';
-import { useState, useEffect, useRef } from 'react';
-import { getVisitPlans, submitVisitUpdate } from '../api/frappeApi';
+import { Typography, Container, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton, Card, CardHeader, CardContent, CardActions, Chip, Skeleton, Tooltip } from '@mui/material';
+import { keyframes } from '@mui/system';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { getVisitPlans, submitVisitUpdate, PAGE_LENGTH } from '../api/frappeApi';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import HistoryIcon from '@mui/icons-material/History';
 import StorefrontIcon from '@mui/icons-material/Storefront';
 import PlaylistAdd from '@mui/icons-material/PlaylistAdd';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import moment from 'moment';
+
+const spin = keyframes`
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+`;
 
 interface VisitPlan {
   name: string;
+  parent: string;
   store_name: string;
   address: string;
   status: 'Draft' | 'Planned' | 'Checked In' | 'Completed' | 'Canceled';
+  parent_docstatus: number;
   planned_visit_time?: string;
   checkin_time?: string;
   checkout_time?: string;
@@ -24,12 +38,55 @@ interface OutletContext {
   employeeId: string | null;
 }
 
+const ScheduleCardSkeleton = () => (
+  <Card sx={{ mb: 3, border: '1px solid #e0e0e0', boxShadow: '4px 4px 8px rgba(0,0,0,0.1)' }}>
+    <CardHeader
+      avatar={<Skeleton animation="wave" variant="circular" width={40} height={40} />}
+      title={<Skeleton animation="wave" height={20} width="80%" />}
+      sx={{ backgroundColor: 'grey.200' }}
+    />
+    <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
+      <Skeleton animation="wave" height={15} width="90%" />
+      <Skeleton animation="wave" height={15} width="60%" />
+      <Skeleton animation="wave" height={15} width="60%" />
+      <Skeleton animation="wave" height={15} width="60%" />
+    </CardContent>
+    <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5, backgroundColor: 'grey.50' }}>
+      <Skeleton animation="wave" variant="circular" width={32} height={32} />
+      <Skeleton animation="wave" variant="rectangular" width={100} height={36} />
+    </CardActions>
+  </Card>
+);
+
 const VisitSchedulePage = () => {
+  const STATUS_ORDER: { [key: string]: number } = {
+    "Checked In": 0,
+    "Planned": 1,
+    "Completed": 2,
+    "Canceled": 3,
+    "Draft": 4,
+  };
   const { employeeId } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+
+  const observer = useRef<IntersectionObserver>(null);
+  const lastPlanElementRef = useCallback((node: HTMLElement | null) => {
+    if (isFetchingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setPage(prevPage => prevPage + 1);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [isFetchingMore, hasMore]);
+
   const [openCheckoutDialog, setOpenCheckoutDialog] = useState(false);
   const [currentPlanName, setCurrentPlanName] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -39,137 +96,134 @@ const VisitSchedulePage = () => {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const [isCountdownActive, setIsCountdownActive] = useState(false);
+
+  const sortPlans = (plans: VisitPlan[]) => {
+    return plans.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
+  };
+
+  const fetchVisitPlans = useCallback(async (currentPage: number) => {
+    if (currentPage === 0 && !isFetchingMore) {
+        setLoading(true);
+    } else {
+        setIsFetchingMore(true);
+    }
+    try {
+        const newPlans = await getVisitPlans(currentPage);
+        if (newPlans.length < PAGE_LENGTH) {
+            setHasMore(false);
+        }
+        if (newPlans.length > 0) {
+            setVisitPlans(prevPlans => {
+                const allPlans = [...prevPlans, ...newPlans];
+                const uniquePlans = Array.from(new Map(allPlans.map(p => [p.name, p])).values());
+                return sortPlans(uniquePlans);
+            });
+        }
+    } catch (err: any) {
+        setError(err.message || 'Failed to fetch data.');
+    } finally {
+        if (currentPage === 0) {
+            setLoading(false);
+        }
+        setIsFetchingMore(false);
+    }
+  }, [isFetchingMore]);
 
   useEffect(() => {
-    const fetchVisitPlans = async () => {
-      if (!employeeId) {
-        setError("Employee ID not available.");
-        setLoading(false);
-        return;
-      }
-      try {
-        setLoading(true);
-        const plans = await getVisitPlans();
-        setVisitPlans(plans);
-      } catch (err: any) {
-        setError(err.message || 'Failed to fetch data.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchVisitPlans();
-  }, [employeeId]);
-
-  const getStatusChip = (status: VisitPlan['status']) => {
-    let color: 'default' | 'warning' | 'success' | 'error' = 'default';
-    let label = status;
-
-    switch (status) {
-      case 'Checked In':
-        color = 'warning';
-        break;
-      case 'Completed':
-        color = 'success';
-        break;
-      case 'Canceled':
-        color = 'error';
-        break;
-      case 'Planned':
-      case 'Draft':
-        color = 'default';
-        label = status;
-        break;
+    if (employeeId) {
+      fetchVisitPlans(page);
     }
-    return <Chip label={label} color={color} size="small" sx={{ fontWeight: 'bold' }} />;
+  }, [employeeId, page, fetchVisitPlans]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isCountdownActive && countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+    } else if (countdown === 0) {
+      setIsCountdownActive(false);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown, isCountdownActive]);
+
+  // DEBUGGING useEffect: Log visitPlans whenever it changes
+  useEffect(() => {
+    console.log("DEBUG: visitPlans state updated:", visitPlans);
+    visitPlans.forEach(plan => {
+      if (plan.checkout_time) {
+        console.log(`DEBUG: Plan ${plan.name} Checkout Time: ${plan.checkout_time}, Is Valid: ${moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').isValid()}`);
+      }
+    });
+  }, [visitPlans]);
+
+  const getStatusChip = (plan: VisitPlan) => {
+    if (plan.parent_docstatus === 0) {
+        return (
+            <Tooltip title={plan.parent} arrow>
+                <Chip label="Draft" color="warning" size="small" sx={{ fontWeight: 'bold' }} />
+            </Tooltip>
+        );
+    }
+    let color: 'primary' | 'secondary' | 'success' | 'error' | 'default' = 'default';
+    let label = plan.status;
+    switch (plan.status) {
+      case 'Planned': color = 'primary'; break;
+      case 'Checked In': color = 'secondary'; break;
+      case 'Completed': color = 'success'; break;
+      case 'Canceled': color = 'error'; break;
+      default: label = 'Draft'; color = 'error'; break;
+    }
+    return (
+        <Tooltip title={plan.parent} arrow>
+            <Chip label={label} color={color} size="small" sx={{ fontWeight: 'bold' }} />
+        </Tooltip>
+    );
   };
 
   const handleCheckIn = async (name: string) => {
-  try {
-    setLoading(true);
-    const success = await submitVisitUpdate(name, 'Checked In');
-    console.log("handleCheckIn - success from API:", success); // ADDED LOG
-    if (success) {
-      console.log("handleCheckIn - entering if block"); // ADDED LOG
-      setVisitPlans(prevPlans =>
-        prevPlans.map(plan =>
-          plan.name === name
-            ? { ...plan, status: 'Checked In', checkin_time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) }
-            : plan
-        )
-      );
-    } else {
-      console.log("handleCheckIn - entering else block"); // ADDED LOG
-      setError('Failed to check-in.');
+    try {
+      const success = await submitVisitUpdate(name, 'Checked In');
+      if (success) {
+        setVisitPlans(prevPlans => sortPlans(prevPlans.map(plan => plan.name === name ? { ...plan, status: 'Checked In', checkin_time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) } : plan )) );
+      } else {
+        setError('Failed to check-in.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred during check-in.');
     }
-  } catch (err: any) {
-    console.log("handleCheckIn - entering catch block:", err); // ADDED LOG
-    setError(err.message || 'An unexpected error occurred during check-in.');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleOpenCheckout = (name: string) => {
+    const plan = visitPlans.find(p => p.name === name);
+    if (plan && plan.checkin_time) {
+      const checkinTime = moment(plan.checkin_time, 'DD/MM/YY HH:mm:ss').toDate().getTime();
+      const now = new Date().getTime();
+      const diffSeconds = (now - checkinTime) / 1000;
+      if (diffSeconds < 180) {
+        setCountdown(180 - Math.floor(diffSeconds));
+        setIsCountdownActive(true);
+      }
+    }
     setCurrentPlanName(name);
     setOpenCheckoutDialog(true);
     setPhotoDataUrl(null);
-    setCurrentLocation(null);
+    setPhotoFile(null);
     setCheckoutError(null);
-    startCamera();
-    getGeolocation();
-  };
-
-  const handleCloseCheckout = () => {
-    setOpenCheckoutDialog(false);
-    stopCamera();
-  };
-
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-    } catch (err) {
-      console.error("Error accessing camera: ", err);
-      setCheckoutError('Failed to access camera. Please grant permissions.');
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      const tracks = stream.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-  };
-
-  const takePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const context = canvasRef.current.getContext('2d');
-      if (context) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-        context.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
-
-        // Mengonversi canvas ke Blob (multipart/form-data)
-        canvasRef.current.toBlob((blob) => {
-          if (blob) {
-            // Buat objek File dari Blob
-            const file = new File([blob], `checkout_photo_${Date.now()}.png`, { type: 'image/png' });
-            setPhotoFile(file); // Simpan File di state
-            setPhotoDataUrl(URL.createObjectURL(blob)); // Tetap gunakan dataUrl untuk preview
-          } else {
-            setCheckoutError('Failed to capture photo as Blob.');
+    
+    // Start camera and get location
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
           }
-        }, 'image/png', 0.8); // Kualitas kompresi 80% untuk PNG
-      }
+        })
+        .catch(err => {
+          console.error("Camera access denied:", err);
+        });
     }
-  };
 
-  const getGeolocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -178,163 +232,200 @@ const VisitSchedulePage = () => {
             longitude: position.coords.longitude,
           });
         },
-        (geoError) => {
-          console.error("Error getting geolocation: ", geoError);
-          setCheckoutError('Failed to get location. Please grant permissions.');
+        (error) => {
+          console.error("Location access denied:", error);
+          setCheckoutError("Location access is required.");
         }
       );
     } else {
-      setCheckoutError('Geolocation is not supported by your browser.');
+      setCheckoutError("Geolocation is not supported by your browser.");
     }
   };
 
+  const handleCloseCheckout = () => {
+    setOpenCheckoutDialog(false);
+    setCurrentPlanName(null);
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const takePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          if (blob) {
+            const file = new File([blob], "checkout_photo.png", { type: "image/png" });
+            setPhotoFile(file);
+          }
+        }, 'image/png');
+        setPhotoDataUrl(canvas.toDataURL('image/png'));
+      }
+    }
+  };
+  
   const handleConfirmCheckout = async () => {
-    if (!currentPlanName) return;
+    if (!currentPlanName || !photoFile || !currentLocation) {
+      setCheckoutError('Photo and location are required.');
+      return;
+    }
+
     setCheckoutLoading(true);
     setCheckoutError(null);
 
     try {
-      const success = await submitVisitUpdate(currentPlanName, 'Completed', {
-        latitude: currentLocation?.latitude,
-        longitude: currentLocation?.longitude,
-        photo_file: photoFile,
-      });
+      const payload = {
+        status: 'Completed',
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        photo: photoFile,
+        checkout_time: moment().format('DD/MM/YY HH:mm:ss'),
+      };
+      
+      const success = await submitVisitUpdate(currentPlanName, 'Completed', payload);
 
       if (success) {
-        setVisitPlans(prevPlans =>
-          prevPlans.map(plan =>
-            plan.name === currentPlanName
-              ? { ...plan, status: 'Completed', checkout_time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }), latitude: currentLocation?.latitude, longitude: currentLocation?.longitude, photo_url: photoDataUrl }
-              : plan
-          )
-        );
+        setCheckoutLoading(false);
         handleCloseCheckout();
+        // Update the plan status in the state
+        setVisitPlans(prevPlans => sortPlans(prevPlans.map(plan => plan.name === currentPlanName ? { ...plan, status: 'Completed', checkout_time: payload.checkout_time } : plan)));
       } else {
+        setCheckoutLoading(false);
         setCheckoutError('Failed to complete checkout.');
       }
     } catch (err: any) {
-      setCheckoutError(err.message || 'An unexpected error occurred during checkout.');
-    } finally {
       setCheckoutLoading(false);
+      setCheckoutError(err.message || 'An unexpected error occurred during checkout.');
     }
   };
 
-  const handleViewOrderHistory = (storeName: string) => {
-    navigate(`/history/${storeName}`);
-  };
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
-  }
-
   return (
     <>
-      <Container sx={{ mt: 0, alignSelf: 'flex-start' }}>
-        {visitPlans.length === 0 ? (
-          <Box sx={{ textAlign: 'top', mt:1 , p: 3, border: '2px dashed', borderColor: 'grey.300', borderRadius: 2 }}>
-            <PlaylistAdd sx={{ fontSize: 60, color: 'grey.400' }} />
-            <Typography variant="h6" sx={{ mt: 2, color: 'text.secondary', fontWeight: 'bold' }}>
-              Tidak Ada Rencana Kunjungan
-            </Typography>
-            <Typography variant="body1" sx={{ mt: 1, color: 'text.secondary' }}>
-              Jadwal untuk hari ini masih kosong.
-            </Typography>
-            <Button
-              variant="contained"
-              sx={{ mt: 3 }}
-              onClick={() => navigate('/input-visit')} // Asumsi rute ini benar
-            >
-              Buat Kunjungan Baru
-            </Button>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ fontWeight: 'bold' }}>
+          My Visit Schedule
+        </Typography>
+
+        <Box sx={{ mb: 2, textAlign: 'right' }}>
+          <Button 
+            variant="contained" 
+            startIcon={<HistoryIcon />}
+            onClick={() => navigate('/history')}
+          >
+            History
+          </Button>
+        </Box>
+
+        {loading && page === 0 ? (
+          <Box>
+            <ScheduleCardSkeleton />
+            <ScheduleCardSkeleton />
+            <ScheduleCardSkeleton />
           </Box>
+        ) : error ? (
+          <Alert severity="error">{error}</Alert>
+        ) : visitPlans.length === 0 ? (
+          <Alert severity="info" sx={{ mt: 2 }}>No visit plans found.</Alert>
         ) : (
-          <Box sx={{ width: '100%' }}>
-            {visitPlans.map((plan) => (
-              <Card key={plan.name} sx={{ mb: 3, border: '1px solid #e0e0e0', boxShadow: '4px 4px 8px rgba(0,0,0,0.1)' }}>
+          <Box>
+            {visitPlans.map((plan, index) => (
+              <Card 
+                key={plan.name}
+                sx={{ mb: 3, border: '1px solid #e0e0e0', boxShadow: '4px 4px 8px rgba(0,0,0,0.1)' }}
+                ref={visitPlans.length === index + 1 ? lastPlanElementRef : null}
+              >
                 <CardHeader
-                  avatar={<StorefrontIcon color="primary" fontSize="large" />}
-                  action={getStatusChip(plan.status)}
-                  title={plan.store_name}
-                  titleTypographyProps={{ fontWeight: 'bold', variant: 'h6' }}
-                  sx={{
-                    backgroundColor: 'grey.200',
-                    '& .MuiCardHeader-action': { alignSelf: 'center' },
-                  }}
+                  avatar={<StorefrontIcon sx={{ color: 'primary.main', fontSize: 40 }} />}
+                  title={<Typography variant="h6" sx={{ fontWeight: 'bold' }}>{plan.store_name}</Typography>}
+                  subheader={<Typography variant="body2" color="text.secondary">{plan.address}</Typography>}
+                  sx={{ backgroundColor: 'grey.100', py: 1.5 }}
                 />
                 <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
-                  <Typography variant="body2"><strong>Alamat:</strong><br/>{plan.address}</Typography>
-                  <Typography variant="body2"><strong>Jadwal:</strong> {plan.planned_visit_time || '-'}</Typography>
-                  <Typography variant="body2"><strong>Check In:</strong> {plan.checkin_time || '-'}</Typography>
-                  <Typography variant="body2"><strong>Check Out:</strong> {plan.checkout_time || '-'}</Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Chip label={`Planned Visit Time: ${plan.planned_visit_time ? moment(plan.planned_visit_time, 'HH:mm:ss').format('HH:mm') : 'N/A'}`} color="info" size="small" />
+                    {getStatusChip(plan)}
+                  </Box>
+                  <Chip
+                    icon={<PlaylistAdd />}
+                    label={`Check-in Time: ${plan.checkin_time ? moment(plan.checkin_time, 'DD/MM/YY HH:mm:ss').format('HH:mm') : 'N/A'}`}
+                    variant="outlined"
+                    size="small"
+                  />
+                  <Chip
+                    icon={<PlaylistAdd />}
+                    label={`Checkout Time: ${plan.checkout_time ? moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').format('HH:mm') : 'N/A'}`}
+                    variant="outlined"
+                    size="small"
+                  />
                   {plan.notes && (
-                    <Typography variant="body2"><strong>Catatan:</strong> {plan.notes}</Typography>
+                      <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                          Notes: {plan.notes}
+                      </Typography>
                   )}
                 </CardContent>
                 <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5, backgroundColor: 'grey.50' }}>
-                  <IconButton aria-label="view order history" onClick={() => handleViewOrderHistory(plan.store_name)}>
-                    <HistoryIcon />
+                  <IconButton onClick={() => navigate(`/notes/${plan.name}`)} aria-label="Add Notes">
+                    <Tooltip title="Add Notes">
+                      <PlaylistAdd sx={{ color: 'primary.main' }} />
+                    </Tooltip>
                   </IconButton>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    {(plan.status === 'Draft' || plan.status === 'Planned') && (
-                      <Button variant="contained" onClick={() => handleCheckIn(plan.name)}>
-                        Check-in
+                  <Box>
+                    {plan.status === 'Planned' && (
+                      <Button variant="contained" color="secondary" onClick={() => handleCheckIn(plan.name)}>
+                        Check In
                       </Button>
                     )}
                     {plan.status === 'Checked In' && (
-                      <Button variant="contained" color="secondary" onClick={() => handleOpenCheckout(plan.name)}>
-                        Checkout
+                      <Button 
+                        variant="contained" 
+                        color="success" 
+                        onClick={() => handleOpenCheckout(plan.name)}
+                        disabled={isCountdownActive}
+                      >
+                        {isCountdownActive ? `Wait ${countdown}s` : 'Check Out'}
                       </Button>
                     )}
                   </Box>
                 </CardActions>
               </Card>
             ))}
+            {isFetchingMore && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+                <CircularProgress />
+              </Box>
+            )}
+            {!hasMore && (
+              <Typography variant="body2" align="center" color="text.secondary" sx={{ my: 2 }}>
+                You have reached the end of the list.
+              </Typography>
+            )}
           </Box>
         )}
       </Container>
-
-      <Dialog open={openCheckoutDialog} onClose={handleCloseCheckout}>
-        <DialogTitle>Complete Checkout for {visitPlans.find(p => p.name === currentPlanName)?.store_name}</DialogTitle>
+      <Dialog open={openCheckoutDialog} onClose={handleCloseCheckout} fullWidth maxWidth="sm">
+        <DialogTitle>Complete Checkout</DialogTitle>
         <DialogContent>
           {checkoutError && <Alert severity="error" sx={{ mb: 2 }}>{checkoutError}</Alert>}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle1">Take Photo:</Typography>
-            <video ref={videoRef} style={{ width: '100%', maxWidth: '320px', border: '1px solid #ccc' }} autoPlay playsInline></video>
-            <Button variant="outlined" onClick={takePhoto} disabled={!videoRef.current?.srcObject}>
-              Capture Photo
-            </Button>
-            {photoDataUrl && (
-              <Box>
-                <Typography variant="subtitle2">Preview:</Typography>
-                <img src={photoDataUrl} alt="Captured" style={{ width: '100%', maxWidth: '320px', border: '1px solid #ccc' }} />
-              </Box>
-            )}
-            <canvas ref={canvasRef} style={{ display: 'none' }}></canvas>
-
-            <Typography variant="subtitle1">Current Location:</Typography>
-            {currentLocation ? (
-              <Typography>Lat: {currentLocation.latitude.toFixed(6)}, Lng: {currentLocation.longitude.toFixed(6)}</Typography>
-            ) : (
-              <CircularProgress size={20} />
-            )}
+            <Typography>Take Photo:</Typography>
+            <video ref={videoRef} style={{ width: '100%', border: '1px solid #ccc' }} autoPlay playsInline />
+            <Button variant="outlined" onClick={takePhoto} disabled={!videoRef.current?.srcObject}>Capture Photo</Button>
+            {photoDataUrl && <img src={photoDataUrl} alt="Captured" style={{ width: '100%', border: '1px solid #ccc' }} />}
+            <canvas ref={canvasRef} style={{ display: 'none' }} />
+            <Typography>Current Location:</Typography>
+            {currentLocation ? <Typography>Lat: {currentLocation.latitude.toFixed(6)}, Lng: {currentLocation.longitude.toFixed(6)}</Typography> : <CircularProgress size={20} />}
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseCheckout} disabled={checkoutLoading}>Cancel</Button>
-          <Button onClick={handleConfirmCheckout} disabled={checkoutLoading || !photoDataUrl || !currentLocation} variant="contained">
-            {checkoutLoading ? <CircularProgress size={24} color="inherit" /> : 'Complete Checkout'}
+          <Button onClick={handleConfirmCheckout} disabled={checkoutLoading || !photoDataUrl || !currentLocation || isCountdownActive} variant="contained">
+            {isCountdownActive ? `Wait ${countdown}s` : (checkoutLoading ? <CircularProgress size={24} color="inherit" /> : 'Complete Checkout')}
           </Button>
         </DialogActions>
       </Dialog>
