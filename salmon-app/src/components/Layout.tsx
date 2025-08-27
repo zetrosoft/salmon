@@ -28,6 +28,13 @@ const nameMap: { [key: string]: string } = {
   'history': 'Order History'
 };
 
+
+const PageLoader = () => (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 64px)' }}>
+    <CircularProgress />
+  </Box>
+);
+
 const Layout = ({ onLogout, employeeId }: LayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
@@ -80,12 +87,6 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
           <ListItemText primary="Logout" />
         </ListItemButton>
       </List>
-    </Box>
-  );
-
-  const PageLoader = () => (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'calc(100vh - 64px)' }}>
-      <CircularProgress />
     </Box>
   );
 

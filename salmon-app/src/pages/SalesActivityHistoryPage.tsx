@@ -1,17 +1,8 @@
 import { AppBar, Toolbar, Typography, Container, Box, CircularProgress, Alert, IconButton, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { getSalesActivityHistory } from '../api/frappeApi';
-
-interface SalesActivity {
-  Date: string;
-  Customer: string;
-  Checkin: string;
-  Checkout: string;
-  Duration: number;
-  Status: string;
-}
+import { useOutletContext } from 'react-router-dom';
+import type { SalesActivity } from '../types';
 
 interface OutletContext {
   employeeId: string | null;
@@ -19,24 +10,19 @@ interface OutletContext {
 
 const SalesActivityHistoryPage = () => {
   const { employeeId } = useOutletContext<OutletContext>();
-  const { customer: initialCustomer } = useParams<{ customer?: string }>();
-  const navigate = useNavigate();
-
   const [activities, setActivities] = useState<SalesActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
-  const [customerFilter, setCustomerFilter] = useState<string>(initialCustomer || '');
+  const [customerFilter, setCustomerFilter] = useState<string>('');
 
   useEffect(() => {
-    if (employeeId) {
-      const today = new Date();
-      const lastWeek = new Date(today.setDate(today.getDate() - 7));
-      setFromDate(lastWeek.toISOString().split('T')[0]);
-      setToDate(new Date().toISOString().split('T')[0]);
-    }
-  }, [employeeId]);
+    const today = new Date();
+    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+    setFromDate(lastMonth.toISOString().split('T')[0]);
+    setToDate(new Date().toISOString().split('T')[0]);
+  }, []);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -50,8 +36,9 @@ const SalesActivityHistoryPage = () => {
       try {
         const history = await getSalesActivityHistory(fromDate, toDate, customerFilter);
         setActivities(history);
-      } catch (err: any) {
-        setError(err.message || 'Failed to fetch sales activity history.');
+      } catch (err: unknown) {
+        const error = err as Error;
+        setError(error.message || 'Failed to fetch sales activity history.');
       } finally {
         setLoading(false);
       }
@@ -59,11 +46,9 @@ const SalesActivityHistoryPage = () => {
     fetchHistory();
   }, [employeeId, fromDate, toDate, customerFilter]);
 
-  
-
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
       </Box>
     );
@@ -71,79 +56,82 @@ const SalesActivityHistoryPage = () => {
 
   if (error) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <TextField
-            label="From Date"
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            InputLabelProps={{
-              shrink: true,
-            }}
-          />
-          <TextField
-            label="To Date"
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            InputLabelProps={{
-              shrink: true,
-            }}
-          />
-          <TextField
-            label="Customer"
-            value={customerFilter}
-            onChange={(e) => setCustomerFilter(e.target.value)}
-            sx={{ flexGrow: 1 }}
-          />
-        </Box>
+    <Container maxWidth="lg" sx={{ mt: 2 }}>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Sales Activity History
+      </Typography>
+      <Box sx={{ mb: 1, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <TextField
+          label="From Date"
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          InputLabelProps={{
+            shrink: true,
+          }}
+        />
+        <TextField
+          label="To Date"
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          InputLabelProps={{
+            shrink: true,
+          }}
+        />
+        <TextField
+          label="Customer"
+          value={customerFilter}
+          onChange={(e) => setCustomerFilter(e.target.value)}
+          sx={{ flexGrow: 1 }}
+        />
+      </Box>
 
-        {activities.length === 0 ? (
-          <Typography variant="subtitle1" sx={{ textAlign: 'center', mt: 4 }}>
-            No activities found for the selected criteria.
-          </Typography>
-        ) : (
-          <TableContainer component={Paper}>
-            <Table sx={{ minWidth: 650 }} aria-label="sales activity table">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Customer</TableCell>
-                  <TableCell>Check-in</TableCell>
-                  <TableCell>Check-out</TableCell>
-                  <TableCell>Duration (min)</TableCell>
-                  <TableCell>Status</TableCell>
+      {activities.length === 0 ? (
+        <Typography variant="subtitle1" sx={{ textAlign: 'center', mt: 4 }}>
+          No activities found for the selected criteria.
+        </Typography>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table sx={{ minWidth: 650 }} aria-label="sales activity table">
+            <TableHead>
+              <TableRow>
+                <TableCell>Date</TableCell>
+                <TableCell>Customer</TableCell>
+                <TableCell>Check-in</TableCell>
+                <TableCell>Check-out</TableCell>
+                <TableCell>Duration (min)</TableCell>
+                <TableCell>Status</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {activities.map((activity) => (
+                <TableRow
+                  key={`${activity.Date}-${activity.Checkin}`}
+                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                >
+                  <TableCell component="th" scope="row">
+                    {activity.Date}
+                  </TableCell>
+                  <TableCell>{activity.Customer}</TableCell>
+                  <TableCell>{activity.Checkin}</TableCell>
+                  <TableCell>{activity.Checkout}</TableCell>
+                  <TableCell>{activity.Duration}</TableCell>
+                  <TableCell>{activity.Status}</TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {activities.map((activity, index) => (
-                  <TableRow
-                    key={index}
-                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                  >
-                    <TableCell component="th" scope="row">
-                      {activity.Date}
-                    </TableCell>
-                    <TableCell>{activity.Customer}</TableCell>
-                    <TableCell>{activity.Checkin}</TableCell>
-                    <TableCell>{activity.Checkout}</TableCell>
-                    <TableCell>{activity.Duration}</TableCell>
-                    <TableCell>{activity.Status}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Container>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Container>
   );
 };
 

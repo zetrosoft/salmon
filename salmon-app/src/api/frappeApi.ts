@@ -1,7 +1,67 @@
 import axios from 'axios';
-import type { AxiosInstance } from 'axios';
+import type { AxiosInstance, AxiosError } from 'axios';
+
 
 let api: AxiosInstance;
+
+// Define interfaces for the data structures
+interface OrderHistory {
+  name: string;
+  posting_date: string;
+  grand_total: number;
+  status: string;
+}
+
+interface SalesActivity {
+  Date: string;
+  Customer: string;
+  Checkin: string;
+  Checkout: string;
+  Duration: number;
+  Status: string;
+}
+
+interface DashboardData {
+  total_visits_today: number;
+  pending_visits: number;
+  completed_visits_today: number;
+  total_sales_month?: number;
+  total_outstanding_sales?: number;
+  achievement_percentage: number;
+}
+
+interface WeeklyVisitSalesComparisonData {
+  labels: string[];
+  datasets: { label: string; data: number[] }[];
+}
+
+interface WeeklyCustomerOrderData {
+  week: string;
+  [customer: string]: number | string;
+}
+
+interface Customer {
+  name: string;
+}
+
+interface SalesVisitPlanData {
+  sales_person: string;
+  planned_visit_date: string;
+  visit_plan_details: {
+    idx: number;
+    customer: string;
+    address: string;
+    visit_time: string;
+    notes: string;
+  }[];
+}
+
+interface CreateSalesVisitPlanResponse {
+  name: string;
+  status: string;
+  message?: string;
+}
+
 
 export const initializeApi = async () => {
   try {
@@ -16,6 +76,7 @@ export const initializeApi = async () => {
         baseURL: API_BASE_URL,
         withCredentials: true,
     });
+    console.log(API_BASE_URL);
   } catch (error) {
     console.error("Could not load setup.json. Using default API URL.", error);
     api = axios.create({
@@ -75,9 +136,10 @@ export const login = async (username: string, password: string): Promise<LoginRe
     } else {
       return { success: false, message: responseData.message || 'Login failed' };
     }
-  } catch (error: any) {
-    console.error("Login error:", error.response?.data || error.message);
-    return { success: false, message: error.response?.data?.message || 'An unexpected error occurred during login.' };
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Login error:", axiosError.response?.data || axiosError.message);
+    return { success: false, message: axiosError.response?.data?.message || 'An unexpected error occurred during login.' };
   }
 };
 
@@ -108,7 +170,8 @@ export const getVisitPlans = async (page: number): Promise<VisitPlan[]> => {
       },
     });
     return response.data.message || response.data.data || [];
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status >= 400 && error.response.status < 500) {
         console.warn(
@@ -118,8 +181,8 @@ export const getVisitPlans = async (page: number): Promise<VisitPlan[]> => {
         return []; 
       }
     }
-    console.error("Error fetching visit plans:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch visit plans.');
+    console.error("Error fetching visit plans:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch visit plans.');
   }
 };
 
@@ -142,13 +205,12 @@ export const submitVisitUpdate = async (name: string, newStatus: 'Checked In' | 
         'Content-Type': 'multipart/form-data',
       },
     });
-    console.log("submitVisitUpdate response:", response.data); 
-    const success = response.data.message.status === 'success'; 
-    console.log("submitVisitUpdate success boolean:", success); 
+    const success = response.data.message.status === 'success';
     return success; 
-  } catch (error: any) {
-    console.error("Error submitting visit update:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to submit visit update.');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error submitting visit update:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to submit visit update.');
   }
 };
 
@@ -158,79 +220,95 @@ export const getEmployeeId = async (userId: string): Promise<string | null> => {
       params: { user_id: userId },
     });
     return response.data.message || null;
-  } catch (error: any) {
-    console.error("Error fetching employee ID:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch employee ID.');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching employee ID:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch employee ID.');
   }
 };
 
-export const getOrderHistory = async (storeName: string): Promise<any[]> => {
+export const getOrderHistory = async (storeName: string): Promise<OrderHistory[]> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_order_history', {
       params: { store_name: storeName },
     });
     return response.data.message || response.data.data || [];
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status >= 400 && error.response.status < 500) {
         console.warn(`Client error (${error.response.status}) fetching order history. Returning empty array.`, error.response.data);
         return [];
       }
     }
-    console.error("Error fetching order history:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch order history.');
+    console.error("Error fetching order history:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch order history.');
   }
 };
 
-export const getSalesActivityHistory = async (fromDate?: string, toDate?: string, customer?: string): Promise<any[]> => {
+export const getSalesActivityHistory = async (fromDate?: string, toDate?: string, customer?: string): Promise<SalesActivity[]> => {
   try {
-    const params: any = {};
+    const params: Record<string, string> = {};
     if (fromDate) params.from_date = fromDate;
     if (toDate) params.to_date = toDate;
     if (customer) params.customer = customer;
 
     const response = await api.get('/api/method/sales_monitor.api.get_sales_activity_history', { params });
     return response.data.message || response.data.data || [];
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status >= 400 && error.response.status < 500) {
         console.warn(`Client error (${error.response.status}) fetching sales activity history. Returning empty array.`, error.response.data);
         return [];
       }
     }
-    console.error("Error fetching sales activity history:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch sales activity history.');
+    console.error("Error fetching sales activity history:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch sales activity history.');
   }
 };
 
-export const getDashboardData = async (): Promise<any> => {
+export const getDashboardData = async (): Promise<DashboardData> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_dashboard_data');
     const dataToReturn = response.data.message || response.data.data;
+
+    if (dataToReturn && dataToReturn.status === 'error') {
+      throw new Error(dataToReturn.message || 'Failed to fetch dashboard data.');
+    }
+
     return dataToReturn;
-  } catch (error: any) {
-    console.error("Error fetching dashboard data:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch dashboard data.');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching dashboard data:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch dashboard data.');
   }
 };
 
-export const getWeeklyVisitSalesComparisonData = async (): Promise<any> => {
+export const getWeeklyVisitSalesComparisonData = async (): Promise<WeeklyVisitSalesComparisonData> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_weekly_visit_sales_comparison_data');
     return response.data.message || response.data.data;
-  } catch (error: any) {
-    console.error("Error fetching weekly visit sales comparison data:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch weekly visit sales comparison data.');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching weekly visit sales comparison data:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch weekly visit sales comparison data.');
   }
 };
 
-export const getWeeklyCustomerOrderData = async (): Promise<any> => {
+export const getWeeklyCustomerOrderData = async (): Promise<WeeklyCustomerOrderData[]> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_weekly_customer_order_data');
-    return response.data.message || response.data.data;
-  } catch (error: any) {
-    console.error("Error fetching weekly customer order data:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch weekly customer order data.');
+    const data = response.data.message || response.data.data;
+    if (!Array.isArray(data)) {
+      console.error("Backend did not return an array for weekly customer order data:", data);
+      return [];
+    }
+    return data;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching weekly customer order data:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch weekly customer order data.');
   }
 };
 
@@ -256,10 +334,11 @@ export const getCustomers = async (searchText: string = '', page: number = 0): P
         limit_page_length: PAGE_LENGTH,
       },
     });
-    return response.data.message.map((d: any) => d.name) || [];
-  } catch (error: any) {
-    console.error("Error fetching customers:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch customers.');
+    return response.data.message.map((d: Customer) => d.name) || [];
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching customers:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch customers.');
   }
 };
 
@@ -273,21 +352,23 @@ export const getCustomerAddress = async (customerName: string): Promise<string |
       },
     });
     return response.data.message?.primary_address || null;
-  } catch (error: any) {
-    console.error("Error fetching customer address:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to fetch customer address.');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching customer address:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch customer address.');
   }
 };
 
-export const createSalesVisitPlan = async (salesVisitPlanData: any): Promise<any> => {
+export const createSalesVisitPlan = async (salesVisitPlanData: SalesVisitPlanData): Promise<CreateSalesVisitPlanResponse> => {
   try {
     const response = await api.post('/api/method/sales_monitor.api.create_sales_visit_plan', {
       sales_visit_plan_data: salesVisitPlanData,
     });
     return response.data.message;
-  } catch (error: any) {
-    console.error("Error creating sales visit plan:", error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Failed to create sales visit plan.');
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error creating sales visit plan:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to create sales visit plan.');
   }
 };
 

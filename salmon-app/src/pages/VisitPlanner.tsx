@@ -130,7 +130,7 @@ const VisitPlanner = () => {
   }, [debouncedSearchTerm, isCustomerOpen]);
 
 
-  const handleCustomerSelect = useCallback(async (event: any, newValue: string | null) => {
+  const handleCustomerSelect = useCallback(async (_event: React.SyntheticEvent, newValue: string | null) => {
     if (!newValue) {
       setCurrentVisitItem(prev => ({ ...prev, customer: '', address: '' }));
       return;
@@ -138,7 +138,7 @@ const VisitPlanner = () => {
     setCurrentVisitItem(prev => ({ ...prev, customer: newValue, address: 'Loading address...' }));
     try {
       const address = await getCustomerAddress(newValue);
-      const cleanedAddress = address ? address.replace(/<br\s*\/?>/gi, ' ') : 'Address not found.';
+      const cleanedAddress = address ? address.replace(/<brs*\/?>/gi, ' ') : 'Address not found.';
       setCurrentVisitItem(prev => ({ ...prev, address: cleanedAddress }));
     } catch (error) {
       console.error('Error fetching customer address:', error);
@@ -193,8 +193,8 @@ const VisitPlanner = () => {
       } else {
         setFeedback({ type: 'error', message: `Failed to create plan: ${response?.message || 'Unknown error'}` });
       }
-    } catch (error: any) {
-      setFeedback({ type: 'error', message: `Submission Error: ${error.message || 'Unknown error'}` });
+    } catch (error: unknown) {
+      setFeedback({ type: 'error', message: `Submission Error: ${error instanceof Error ? error.message : 'Unknown error'}` });
     } finally {
       setIsSubmitting(false);
     }
@@ -322,7 +322,7 @@ const VisitPlanner = () => {
               <TableBody>
                 {visitPlanDetails.length > 0 ? (
                   visitPlanDetails.map((item, index) => (
-                    <TableRow key={index} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                    <TableRow key={item.idx} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                       <TableCell>{item.idx}</TableCell>
                       <TableCell>{item.customer}</TableCell>
                       <TableCell>{item.address}</TableCell>

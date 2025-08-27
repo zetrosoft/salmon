@@ -1,6 +1,6 @@
 import { Typography, Container, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton, Card, CardHeader, CardContent, CardActions, Chip, Skeleton, Tooltip } from '@mui/material';
 import { keyframes } from '@mui/system';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getVisitPlans, submitVisitUpdate, PAGE_LENGTH } from '../api/frappeApi';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import HistoryIcon from '@mui/icons-material/History';
@@ -45,7 +45,7 @@ const ScheduleCardSkeleton = () => (
       title={<Skeleton animation="wave" height={20} width="80%" />}
       sx={{ backgroundColor: 'grey.200' }}
     />
-    <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
+    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
       <Skeleton animation="wave" height={15} width="90%" />
       <Skeleton animation="wave" height={15} width="60%" />
       <Skeleton animation="wave" height={15} width="60%" />
@@ -59,13 +59,13 @@ const ScheduleCardSkeleton = () => (
 );
 
 const VisitSchedulePage = () => {
-  const STATUS_ORDER: { [key: string]: number } = {
+  const STATUS_ORDER = useMemo(() => ({
     "Checked In": 0,
     "Planned": 1,
     "Completed": 2,
     "Canceled": 3,
     "Draft": 4,
-  };
+  }), []);
   const { employeeId } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const [visitPlans, setVisitPlans] = useState<VisitPlan[]>([]);
@@ -99,11 +99,16 @@ const VisitSchedulePage = () => {
   const [countdown, setCountdown] = useState(0);
   const [isCountdownActive, setIsCountdownActive] = useState(false);
 
-  const sortPlans = (plans: VisitPlan[]) => {
+  const sortPlans = useCallback((plans: VisitPlan[]) => {
     return plans.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
-  };
+  }, [STATUS_ORDER]);
 
   const fetchVisitPlans = useCallback(async (currentPage: number) => {
+    if (!employeeId) {
+      setError("Employee ID not available.");
+      setLoading(false);
+      return;
+    }
     if (currentPage === 0 && !isFetchingMore) {
         setLoading(true);
     } else {
@@ -121,15 +126,15 @@ const VisitSchedulePage = () => {
                 return sortPlans(uniquePlans);
             });
         }
-    } catch (err: any) {
-        setError(err.message || 'Failed to fetch data.');
+    } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch data.');
     } finally {
         if (currentPage === 0) {
             setLoading(false);
         }
         setIsFetchingMore(false);
     }
-  }, [isFetchingMore]);
+  }, [employeeId, isFetchingMore, sortPlans]);
 
   useEffect(() => {
     if (employeeId) {
@@ -152,7 +157,7 @@ const VisitSchedulePage = () => {
     console.log("DEBUG: visitPlans state updated:", visitPlans);
     visitPlans.forEach(plan => {
       if (plan.checkout_time) {
-        console.log(`DEBUG: Plan ${plan.name} Checkout Time: ${plan.checkout_time}, Is Valid: ${moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').isValid()}`);
+        console.log(`DEBUG: Plan ${plan.name} Checkout Time: ${moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').isValid()}`);
       }
     });
   }, [visitPlans]);
@@ -189,8 +194,8 @@ const VisitSchedulePage = () => {
       } else {
         setError('Failed to check-in.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during check-in.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred during check-in.');
     }
   };
 
@@ -219,8 +224,9 @@ const VisitSchedulePage = () => {
             videoRef.current.srcObject = stream;
           }
         })
-        .catch(err => {
+        .catch((err: unknown) => {
           console.error("Camera access denied:", err);
+          setCheckoutError("Camera access is required. Please enable it in your browser settings.");
         });
     }
 
@@ -232,9 +238,21 @@ const VisitSchedulePage = () => {
             longitude: position.coords.longitude,
           });
         },
-        (error) => {
+        (error: unknown) => {
           console.error("Location access denied:", error);
-          setCheckoutError("Location access is required.");
+          let errorMessage = "Location access is required.";
+          if (error instanceof GeolocationPositionError) {
+            if (error.code === error.PERMISSION_DENIED) {
+              errorMessage += " Please enable it in your browser settings.";
+            } else if (error.code === error.POSITION_UNAVAILABLE) {
+              errorMessage += " Location information is unavailable.";
+            } else if (error.code === error.TIMEOUT) {
+              errorMessage += " The request to get user location timed out.";
+            }
+          } else {
+            errorMessage += " An unknown error occurred.";
+          }
+          setCheckoutError(errorMessage);
         }
       );
     } else {
@@ -299,9 +317,9 @@ const VisitSchedulePage = () => {
         setCheckoutLoading(false);
         setCheckoutError('Failed to complete checkout.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setCheckoutLoading(false);
-      setCheckoutError(err.message || 'An unexpected error occurred during checkout.');
+      setCheckoutError(err instanceof Error ? err.message : 'An unexpected error occurred during checkout.');
     }
   };
 
@@ -348,18 +366,29 @@ const VisitSchedulePage = () => {
                 />
                 <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Chip label={`Planned Visit Time: ${plan.planned_visit_time ? moment(plan.planned_visit_time, 'HH:mm:ss').format('HH:mm') : 'N/A'}`} color="info" size="small" />
+                    <Chip
+                    label={
+                      <Box component="span">
+                        Planning :{' '}
+                        <Typography component="span" sx={{ fontWeight: 'bold', color: '#FFFFFF' }}>
+                          {plan.planned_visit_time ? moment(plan.planned_visit_time, 'DD-MM-YYYY HH:mm').format('DD-MM-YYYY HH:mm') : 'N/A'}
+                        </Typography>
+                      </Box>
+                    }
+                    color="info"
+                    size="small"
+                  />
                     {getStatusChip(plan)}
                   </Box>
                   <Chip
                     icon={<PlaylistAdd />}
-                    label={`Check-in Time: ${plan.checkin_time ? moment(plan.checkin_time, 'DD/MM/YY HH:mm:ss').format('HH:mm') : 'N/A'}`}
+                    label={`CheckIn: ${plan.checkin_time ? moment(plan.checkin_time, 'DD/MM/YY HH:mm:ss').format('DD-MM-YY HH:mm') : 'N/A'}`}
                     variant="outlined"
                     size="small"
                   />
                   <Chip
                     icon={<PlaylistAdd />}
-                    label={`Checkout Time: ${plan.checkout_time ? moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').format('HH:mm') : 'N/A'}`}
+                    label={`CheckOut: ${plan.checkout_time ? moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').format('DD-MM-YY HH:mm') : 'N/A'}`}
                     variant="outlined"
                     size="small"
                   />

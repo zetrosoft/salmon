@@ -33,8 +33,12 @@ const ProfilePage = () => {
           email: userEmail,
           role: 'Sales Person', // Mock role
         });
-      } catch (err: any) {
-        setError(err.message || 'Failed to fetch user details.');
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message || 'Failed to fetch user details.');
+        } else {
+          setError('An unknown error occurred.');
+        }
       } finally {
         setLoading(false);
       }

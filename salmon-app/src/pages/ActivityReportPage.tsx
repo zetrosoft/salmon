@@ -2,15 +2,7 @@ import { AppBar, Toolbar, Typography, Container, Box, CircularProgress, Alert, I
 import { useState, useEffect } from 'react';
 import { getSalesActivityHistory } from '../api/frappeApi';
 import { useOutletContext } from 'react-router-dom';
-
-interface SalesActivity {
-  Date: string;
-  Customer: string;
-  Checkin: string;
-  Checkout: string;
-  Duration: number;
-  Status: string;
-}
+import type { SalesActivity } from '../types';
 
 interface OutletContext {
   employeeId: string | null;
@@ -44,8 +36,9 @@ const ActivityReportPage = () => {
       try {
         const history = await getSalesActivityHistory(fromDate, toDate, customerFilter);
         setActivities(history);
-      } catch (err: any) {
-        setError(err.message || 'Failed to fetch sales activity history.');
+      } catch (err: unknown) {
+        const error = err as Error;
+        setError(error.message || 'Failed to fetch sales activity history.');
       } finally {
         setLoading(false);
       }
@@ -119,9 +112,9 @@ const ActivityReportPage = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {activities.map((activity, index) => (
+              {activities.map((activity) => (
                 <TableRow
-                  key={index}
+                  key={`${activity.Date}-${activity.Checkin}`}
                   sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                 >
                   <TableCell component="th" scope="row">

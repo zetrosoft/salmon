@@ -32,8 +32,12 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
           setError(backendMessage || 'Login failed');
         }
       }
-    } catch (err: any) {
-      setError('An unexpected error occurred. Please try again.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'An unexpected error occurred. Please try again.');
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -42,6 +46,7 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
   return (
     <Container component="main" maxWidth="xs">
       <Paper elevation={3} sx={{ marginTop: 8, padding: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <img src="/logo-siumang@0.33x.svg" alt="Siumang Logo" style={{ width: '100px', marginBottom: '16px' }} />
         <Typography component="h1" variant="h5" sx={{ marginBottom: 2 }}>
           Sales Monitor Login
         </Typography>

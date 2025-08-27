@@ -17,8 +17,8 @@ interface DashboardData {
   total_visits_today: number;
   pending_visits: number;
   completed_visits_today: number;
-  total_sales_month: number;
-  total_outstanding_sales: number;
+  total_sales_month?: number;
+  total_outstanding_sales?: number;
   achievement_percentage: number;
 }
 
@@ -28,13 +28,14 @@ interface WeeklyVisitSalesComparisonData {
 }
 
 interface WeeklyCustomerOrderData {
-  data: { week: string; [customer: string]: number | string }[];
+  week: string;
+  [customer: string]: number | string;
 }
 
 const DashboardPage = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [weeklyVisitSalesComparisonData, setWeeklyVisitSalesComparisonData] = useState<WeeklyVisitSalesComparisonData | null>(null);
-  const [weeklyCustomerOrderData, setWeeklyCustomerOrderData] = useState<WeeklyCustomerOrderData | null>(null);
+  const [weeklyCustomerOrderData, setWeeklyCustomerOrderData] = useState<WeeklyCustomerOrderData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,16 +66,18 @@ const DashboardPage = () => {
         };
 
         // Default data for the weekly customer order grid
-        const defaultCustomerOrderData: WeeklyCustomerOrderData = {
-          data: [],
-        };
+        const defaultCustomerOrderData: WeeklyCustomerOrderData[] = [];
 
         setDashboardData(dashData && dashData.total_visits_today !== undefined ? dashData : defaultDashData);
         setWeeklyVisitSalesComparisonData(visitSalesData && visitSalesData.labels ? visitSalesData : defaultVisitSalesData);
-        setWeeklyCustomerOrderData(customerOrderData && customerOrderData.data ? customerOrderData : defaultCustomerOrderData);
+        setWeeklyCustomerOrderData(customerOrderData && customerOrderData.length > 0 ? customerOrderData : defaultCustomerOrderData);
 
-      } catch (err: any) {
-        setError(err.message || 'Failed to fetch dashboard data.');
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message || 'Failed to fetch dashboard data.');
+        } else {
+          setError('An unknown error occurred.');
+        }
       } finally {
         setLoading(false);
       }
@@ -226,22 +229,22 @@ const DashboardPage = () => {
           <Card>
             <CardHeader title="Weekly Orders by Customer" titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }} sx={{ backgroundColor: 'grey.100' }} />
             <CardContent>
-              {weeklyCustomerOrderData && weeklyCustomerOrderData.data.length > 0 ? (
+              {weeklyCustomerOrderData && weeklyCustomerOrderData.length > 0 ? (
                 <Box sx={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
                       <tr>
                         <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Week</th>
                         {/* Dynamically generate customer headers */}
-                        {weeklyCustomerOrderData.data.length > 0 &&
-                          Object.keys(weeklyCustomerOrderData.data[0]).filter(key => key !== 'week').map(customer => (
+                        {weeklyCustomerOrderData.length > 0 &&
+                          Object.keys(weeklyCustomerOrderData[0]).filter(key => key !== 'week').map(customer => (
                             <th key={customer} style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>{customer}</th>
                           ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {weeklyCustomerOrderData.data.map((row, index) => (
-                        <tr key={index}>
+                      {weeklyCustomerOrderData.map((row: WeeklyCustomerOrderData, index: number) => (
+                        <tr key={row.week}>
                           <td style={{ border: '1px solid #ddd', padding: '8px' }}>{row.week}</td>
                           {Object.keys(row).filter(key => key !== 'week').map(customer => (
                             <td key={customer} style={{ border: '1px solid #ddd', padding: '8px' }}>
