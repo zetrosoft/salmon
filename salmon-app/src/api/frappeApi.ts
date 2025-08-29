@@ -66,6 +66,7 @@ interface CreateSalesVisitPlanResponse {
 export const initializeApi = async () => {
   try {
     const response = await fetch('./setup.json');
+    //console.log(response)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
