@@ -81,7 +81,7 @@ export const initializeApi = async () => {
   } catch (error) {
     console.error("Could not load setup.json. Using default API URL.", error);
     api = axios.create({
-        baseURL: 'http://35.219.54.8:8882', // Fallback URL
+        baseURL: 'http://erp.samkarsa.com', // Fallback URL
         withCredentials: true,
     });
   }
