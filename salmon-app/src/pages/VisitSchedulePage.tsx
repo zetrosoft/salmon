@@ -74,6 +74,7 @@ const VisitSchedulePage = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [totalPlans, setTotalPlans] = useState(0); // Added state for total plans
 
   const observer = useRef<IntersectionObserver>(null);
   const lastPlanElementRef = useCallback((node: HTMLElement | null) => {
@@ -96,65 +97,88 @@ const VisitSchedulePage = () => {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(0);
-  const [isCountdownActive, setIsCountdownActive] = useState(false);
+  
+  // Removed countdown states
 
   const sortPlans = useCallback((plans: VisitPlan[]) => {
     return plans.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
   }, [STATUS_ORDER]);
 
-  const fetchVisitPlans = useCallback(async (currentPage: number) => {
+  const fetchVisitPlans = useCallback(async (pageToFetch: number) => { // Renamed currentPage to pageToFetch
+    //console.log('fetchVisitPlans called. pageToFetch:', pageToFetch, 'loading:', loading, 'isFetchingMore:', isFetchingMore); // Debug log
     if (!employeeId) {
       setError("Employee ID not available.");
       setLoading(false);
+      setIsFetchingMore(false); // Ensure fetching state is reset
       return;
     }
-    if (currentPage === 0 && !isFetchingMore) {
-        setLoading(true);
+
+    if (pageToFetch === 0) {
+      setLoading(true);
     } else {
-        setIsFetchingMore(true);
+      setIsFetchingMore(true);
     }
+
     try {
-        const newPlans = await getVisitPlans(currentPage);
-        if (newPlans.length < PAGE_LENGTH) {
-            setHasMore(false);
-        }
-        if (newPlans.length > 0) {
+        const response = await getVisitPlans(pageToFetch); // getVisitPlans now returns { data, total }
+        const newPlans = response.data;
+        const totalCount = response.total; // Get total count from API response
+
+        /* console.log('API Response:', response); // Debug log
+        console.log('newPlans:', newPlans); // Debug log
+        console.log('totalCount from API:', totalCount); // Debug log */
+
+        if (pageToFetch === 0) { // For initial load or refresh
+            setVisitPlans(sortPlans(newPlans));
+            setTotalPlans(totalCount);
+            setHasMore(newPlans.length < totalCount);
+        } else { // For subsequent loads (infinite scroll)
             setVisitPlans(prevPlans => {
                 const allPlans = [...prevPlans, ...newPlans];
                 const uniquePlans = Array.from(new Map(allPlans.map(p => [p.name, p])).values());
-                return sortPlans(uniquePlans);
+                const sortedUniquePlans = sortPlans(uniquePlans);
+                setHasMore(sortedUniquePlans.length < totalCount); // Update hasMore based on total
+                return sortedUniquePlans;
             });
         }
+
+        setError(null);
     } catch (err: unknown) {
+        console.error('Error fetching visit plans:', err); // Debug log
         setError(err instanceof Error ? err.message : 'Failed to fetch data.');
+        setHasMore(false); // Stop fetching on error
     } finally {
-        if (currentPage === 0) {
+        if (pageToFetch === 0) {
             setLoading(false);
         }
         setIsFetchingMore(false);
+        //console.log('fetchVisitPlans finished. Loading states reset.'); // Debug log
     }
-  }, [employeeId, isFetchingMore, sortPlans]);
+  }, [employeeId, sortPlans, loading, isFetchingMore]); // Added loading and isFetchingMore to dependencies
 
   useEffect(() => {
+    //console.log('useEffect for initial fetch triggered. employeeId:', employeeId); // Debug log
     if (employeeId) {
+      setVisitPlans([]); // Clear plans on initial load
+      setPage(0);
+      setHasMore(true);
+      setTotalPlans(0);
+      fetchVisitPlans(0); // Always fetch page 0 on initial mount/employeeId change
+    }
+  }, [employeeId, fetchVisitPlans]);
+
+  useEffect(() => {
+    //console.log('Page state changed:', page); // Debug log
+    if (page > 0) { // Only fetch if page is incremented by infinite scroll
       fetchVisitPlans(page);
     }
-  }, [employeeId, page, fetchVisitPlans]);
+  }, [page, fetchVisitPlans]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isCountdownActive && countdown > 0) {
-      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    } else if (countdown === 0) {
-      setIsCountdownActive(false);
-    }
-    return () => clearTimeout(timer);
-  }, [countdown, isCountdownActive]);
+  // Removed countdown useEffect
 
   // DEBUGGING useEffect: Log visitPlans whenever it changes
   useEffect(() => {
-    console.log("DEBUG: visitPlans state updated:", visitPlans);
+    //console.log("DEBUG: visitPlans state updated:", visitPlans); // Debug log
     visitPlans.forEach(plan => {
       if (plan.checkout_time) {
         console.log(`DEBUG: Plan ${plan.name} Checkout Time: ${moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').isValid()}`);
@@ -162,7 +186,7 @@ const VisitSchedulePage = () => {
     });
   }, [visitPlans]);
 
-  const getStatusChip = (plan: VisitPlan) => {
+  const getStatusChip = useCallback((plan: VisitPlan) => { // Wrapped in useCallback
     if (plan.parent_docstatus === 0) {
         return (
             <Tooltip title={plan.parent} arrow>
@@ -184,13 +208,13 @@ const VisitSchedulePage = () => {
             <Chip label={label} color={color} size="small" sx={{ fontWeight: 'bold' }} />
         </Tooltip>
     );
-  };
+  }, []); // Added empty dependency array
 
   const handleCheckIn = async (name: string) => {
     try {
       const success = await submitVisitUpdate(name, 'Checked In');
       if (success) {
-        setVisitPlans(prevPlans => sortPlans(prevPlans.map(plan => plan.name === name ? { ...plan, status: 'Checked In', checkin_time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) } : plan )) );
+        fetchVisitPlans(0); // Refetch data from server
       } else {
         setError('Failed to check-in.');
       }
@@ -202,13 +226,10 @@ const VisitSchedulePage = () => {
   const handleOpenCheckout = (name: string) => {
     const plan = visitPlans.find(p => p.name === name);
     if (plan && plan.checkin_time) {
-      const checkinTime = moment(plan.checkin_time, 'DD/MM/YY HH:mm:ss').toDate().getTime();
+      const checkinTime = moment(plan.checkin_time, 'DD-MM-YYYY HH:mm:ss').toDate().getTime(); // Use consistent format
       const now = new Date().getTime();
       const diffSeconds = (now - checkinTime) / 1000;
-      if (diffSeconds < 180) {
-        setCountdown(180 - Math.floor(diffSeconds));
-        setIsCountdownActive(true);
-      }
+      // Removed countdown logic
     }
     setCurrentPlanName(name);
     setOpenCheckoutDialog(true);
@@ -268,60 +289,78 @@ const VisitSchedulePage = () => {
     }
   };
 
-  const takePhoto = () => {
+  const takePhoto = useCallback(() => {
     if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => {
-          if (blob) {
-            const file = new File([blob], "checkout_photo.png", { type: "image/png" });
-            setPhotoFile(file);
-          }
-        }, 'image/png');
-        setPhotoDataUrl(canvas.toDataURL('image/png'));
-      }
-    }
-  };
-  
-  const handleConfirmCheckout = async () => {
-    if (!currentPlanName || !photoFile || !currentLocation) {
-      setCheckoutError('Photo and location are required.');
-      return;
-    }
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+            const dataUrl = canvas.toDataURL('image/jpeg');
+            setPhotoDataUrl(dataUrl);
 
+            // Buat objek File dari data gambar dan simpan di state
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const file = new File([blob], 'captured_photo.jpeg', { type: 'image/jpeg' });
+                    setPhotoFile(file);
+                }
+            }, 'image/jpeg');
+        }
+    }
+  }, []);
+  
+const handleConfirmCheckout = useCallback(async () => {
+    if (!currentLocation || !currentPlanName || !photoFile) {
+        setCheckoutError('Please ensure a photo has been taken and location is available.');
+        return;
+    }
     setCheckoutLoading(true);
     setCheckoutError(null);
 
-    try {
-      const payload = {
-        status: 'Completed',
-        latitude: currentLocation.latitude,
-        longitude: currentLocation.longitude,
-        photo: photoFile,
-        checkout_time: moment().format('DD/MM/YY HH:mm:ss'),
-      };
-      
-      const success = await submitVisitUpdate(currentPlanName, 'Completed', payload);
+      try {
+        const success = await submitVisitUpdate(
+            currentPlanName,
+            'Completed',
+            {
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+                photo_file: photoFile, // Gunakan objek File dari state
+                checkout_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }
+        );
 
       if (success) {
         setCheckoutLoading(false);
         handleCloseCheckout();
-        // Update the plan status in the state
-        setVisitPlans(prevPlans => sortPlans(prevPlans.map(plan => plan.name === currentPlanName ? { ...plan, status: 'Completed', checkout_time: payload.checkout_time } : plan)));
+        fetchVisitPlans(0); // Refetch data from server
       } else {
         setCheckoutLoading(false);
         setCheckoutError('Failed to complete checkout.');
       }
-    } catch (err: unknown) {
+    } catch (error) {
       setCheckoutLoading(false);
-      setCheckoutError(err instanceof Error ? err.message : 'An unexpected error occurred during checkout.');
+      setCheckoutError(error instanceof Error ? error.message : 'An unexpected error occurred during checkout.');
+    } finally{
+      setCheckoutLoading(false)
     }
-  };
+  },[currentPlanName,currentLocation,photoFile]);
+
+  const formatDateTime = useCallback((dateTimeString: string | undefined, plannedDateTimeString: string | undefined) => {
+    if (!dateTimeString) return 'N/A';
+    const dateTime = moment(dateTimeString, 'DD-MM-YYYY HH:mm:ss');
+    if (!dateTime.isValid()) return 'Invalid Date';
+
+    if (plannedDateTimeString) {
+      const plannedDate = moment(plannedDateTimeString, 'DD-MM-YYYY HH:mm');
+      if (plannedDate.isValid() && dateTime.isSame(plannedDate, 'day')) {
+        return dateTime.format('HH:mm');
+      }
+    }
+    return dateTime.format('DD-MM-YYYY HH:mm');
+  }, []);
 
   return (
     <>
@@ -382,13 +421,13 @@ const VisitSchedulePage = () => {
                   </Box>
                   <Chip
                     icon={<PlaylistAdd />}
-                    label={`CheckIn: ${plan.checkin_time ? moment(plan.checkin_time, 'DD/MM/YY HH:mm:ss').format('DD-MM-YY HH:mm') : 'N/A'}`}
+                    label={`CheckIn: ${formatDateTime(plan.checkin_time, plan.planned_visit_time)}`}
                     variant="outlined"
                     size="small"
                   />
                   <Chip
                     icon={<PlaylistAdd />}
-                    label={`CheckOut: ${plan.checkout_time ? moment(plan.checkout_time, 'DD/MM/YY HH:mm:ss').format('DD-MM-YY HH:mm') : 'N/A'}`}
+                    label={`CheckOut: ${formatDateTime(plan.checkout_time, plan.planned_visit_time)}`}
                     variant="outlined"
                     size="small"
                   />
@@ -415,9 +454,8 @@ const VisitSchedulePage = () => {
                         variant="contained" 
                         color="success" 
                         onClick={() => handleOpenCheckout(plan.name)}
-                        disabled={isCountdownActive}
                       >
-                        {isCountdownActive ? `Wait ${countdown}s` : 'Check Out'}
+                        Check Out
                       </Button>
                     )}
                   </Box>
@@ -453,8 +491,8 @@ const VisitSchedulePage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseCheckout} disabled={checkoutLoading}>Cancel</Button>
-          <Button onClick={handleConfirmCheckout} disabled={checkoutLoading || !photoDataUrl || !currentLocation || isCountdownActive} variant="contained">
-            {isCountdownActive ? `Wait ${countdown}s` : (checkoutLoading ? <CircularProgress size={24} color="inherit" /> : 'Complete Checkout')}
+          <Button onClick={handleConfirmCheckout} disabled={checkoutLoading || !photoDataUrl || !currentLocation} variant="contained">
+            {checkoutLoading ? <CircularProgress size={24} color="inherit" /> : 'Complete Checkout'}
           </Button>
         </DialogActions>
       </Dialog>

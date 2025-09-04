@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.VITE_APP_VERSION),
+    'import.meta.env.VITE_APP_BUILD': JSON.stringify(process.env.VITE_APP_BUILD),
+  },
   optimizeDeps: {
     include: [
       'react',

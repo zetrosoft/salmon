@@ -24,7 +24,7 @@ const nameMap: { [key: string]: string } = {
   'activity': 'Visit Activity',
   'report': 'Activity Report',
   'profile': 'User Profile',
-  'input-visit': 'Input Kunjungan',
+  'input-visit': 'Create Planning',
   'history': 'Order History'
 };
 
@@ -52,8 +52,8 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
   };
 
   const drawer = (
-    <Box onClick={handleDrawerClose} sx={{ textAlign: 'center' }}>
-      <Box sx={{ my: 2 }}>
+    <Box onClick={handleDrawerClose} sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ my: 2, textAlign: 'center' }}>
         <img src="logo-siumang@0.33x.svg" alt="Si Umang Logo" style={{ maxHeight: '50px' }} />
       </Box>
       <List>
@@ -67,7 +67,7 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
         </ListItemButton>
         <ListItemButton component={RouterLink} to="/input-visit" selected={location.pathname.startsWith('/input-visit')}>
           <AddLocationAltIcon sx={{ mr: 1 }} />
-          <ListItemText primary="Input Kunjungan" />
+          <ListItemText primary="Create Planning" />
         </ListItemButton>
         <ListItemButton component={RouterLink} to="/activity" selected={location.pathname.startsWith('/activity')}>
           <HistoryIcon sx={{ mr: 1 }} />
@@ -87,6 +87,12 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
           <ListItemText primary="Logout" />
         </ListItemButton>
       </List>
+      {/* --- Footer --- */}
+      <Box sx={{ p: 2, mt: 'auto', textAlign: 'center' }}>
+        <Typography variant="caption" display="block" color="text.secondary">
+          Version 1.0.0
+        </Typography>
+      </Box>
     </Box>
   );
 

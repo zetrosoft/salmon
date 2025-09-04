@@ -212,7 +212,7 @@ const VisitPlanner = () => {
     <LocalizationProvider dateAdapter={AdapterMoment}>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Paper elevation={3} sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
-          <Typography variant="h5" gutterBottom>Input Sales Visit Plan</Typography>
+          <Typography variant="h5" gutterBottom>Create Planning</Typography>
           
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={4}>
@@ -307,7 +307,9 @@ const VisitPlanner = () => {
           </Box>
 
           <Typography variant="h5" gutterBottom>Current Visit Plan Items</Typography>
-          <TableContainer component={Paper}>
+
+          {/* Table for larger screens */}
+          <TableContainer component={Paper} sx={{ display: { xs: 'none', md: 'block' } }}>
             <Table sx={{ minWidth: 650 }}>
               <TableHead>
                 <TableRow>
@@ -322,7 +324,7 @@ const VisitPlanner = () => {
               <TableBody>
                 {visitPlanDetails.length > 0 ? (
                   visitPlanDetails.map((item, index) => (
-                    <TableRow key={item.idx} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                    <TableRow key={item.idx}>
                       <TableCell>{item.idx}</TableCell>
                       <TableCell>{item.customer}</TableCell>
                       <TableCell>{item.address}</TableCell>
@@ -343,6 +345,33 @@ const VisitPlanner = () => {
               </TableBody>
             </Table>
           </TableContainer>
+
+          {/* Cards for smaller screens */}
+          <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+            {visitPlanDetails.length > 0 ? (
+              visitPlanDetails.map((item, index) => (
+                <Paper key={item.idx} elevation={2} sx={{ p: 2, mb: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{item.customer}</Typography>
+                    <IconButton color="error" onClick={() => removeVisitPlanItem(index)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{item.address}</Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Time:</strong> {item.visit_time ? item.visit_time.format('HH:mm') : 'N/A'}
+                  </Typography>
+                  {item.notes && (
+                    <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
+                      <strong>Notes:</strong> {item.notes}
+                    </Typography>
+                  )}
+                </Paper>
+              ))
+            ) : (
+              <Typography align="center" color="text.secondary" sx={{ py: 3 }}>No visit items added yet.</Typography>
+            )}
+          </Box>
         </Paper>
       </Container>
     </LocalizationProvider>

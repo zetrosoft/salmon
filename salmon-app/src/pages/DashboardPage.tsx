@@ -197,7 +197,7 @@ const DashboardPage = () => {
                     datasets: weeklyVisitSalesComparisonData.datasets.map(dataset => ({
                       label: dataset.label,
                       data: dataset.data,
-                      backgroundColor: dataset.label === 'Visits' ? 'rgba(75, 192, 192, 0.6)' : 'rgba(153, 102, 255, 0.6)',
+                      backgroundColor: dataset.label === 'Completed' ? 'rgba(75, 192, 192, 0.6)' : 'rgba(153, 102, 255, 0.6)',
                     })),
                   }}
                   options={{

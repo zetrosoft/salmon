@@ -65,7 +65,7 @@ interface CreateSalesVisitPlanResponse {
 
 export const initializeApi = async () => {
   try {
-    const response = await fetch('./setup.json');
+    const response = await fetch('/setup.json');
     //console.log(response)
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -77,11 +77,11 @@ export const initializeApi = async () => {
         baseURL: API_BASE_URL,
         withCredentials: true,
     });
-    console.log(API_BASE_URL);
+    //console.log(API_BASE_URL);
   } catch (error) {
     console.error("Could not load setup.json. Using default API URL.", error);
     api = axios.create({
-        baseURL: 'http://erp.samkarsa.com', // Fallback URL
+        baseURL: 'https://erp.samkarsa.com', // Fallback URL
         withCredentials: true,
     });
   }
@@ -95,7 +95,7 @@ export const initializeApi = async () => {
     if ((config.method === 'post' || config.method === 'put' || config.method === 'delete') &&
         config.url !== '/api/method/sales_monitor.api.pwa_login') {
       const csrfToken = sessionStorage.getItem('frappe_csrf_token'); // Get from sessionStorage
-        console.log('CSRF Token from sessionStorage:', csrfToken);
+        
       if (csrfToken) {
         config.headers['X-Frappe-CSRF-Token'] = csrfToken;
       }
@@ -129,6 +129,7 @@ export const login = async (username: string, password: string): Promise<LoginRe
         sessionStorage.setItem('frappe_csrf_token', csrfToken.split('=')[1]);
       }
       sessionStorage.setItem('frappe_user_id', responseData.user_id);
+      sessionStorage.setItem('frappe_full_name', responseData.full_name);
       return {
         success: true,
         salesName: responseData.employee_id, // Assuming employee_id is the salesName
@@ -144,7 +145,7 @@ export const login = async (username: string, password: string): Promise<LoginRe
   }
 };
 
-interface VisitPlan {
+export interface VisitPlan {
   name: string; 
   parent: string;
   store_name: string;
@@ -161,7 +162,12 @@ interface VisitPlan {
 }
 
 export const PAGE_LENGTH = 5;
-export const getVisitPlans = async (page: number): Promise<VisitPlan[]> => { 
+export interface VisitPlansResponse {
+  data: VisitPlan[];
+  total: number;
+}
+
+export const getVisitPlans = async (page: number): Promise<VisitPlansResponse> => { 
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_sales_visit_plans', {
       params: { 
@@ -170,16 +176,18 @@ export const getVisitPlans = async (page: number): Promise<VisitPlan[]> => {
         limit_page_length: PAGE_LENGTH,
       },
     });
-    return response.data.message || response.data.data || [];
+    // Backend returns { data: [], total: 0 }
+    const responseData = response.data.message || response.data;
+    return responseData.data ? responseData : { data: [], total: 0 };
   } catch (error: unknown) {
     const axiosError = error as AxiosError<{ message: string }>;
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status >= 400 && error.response.status < 500) {
         console.warn(
-          `Client error (${error.response.status}) saat mengambil data visit plans. Mengembalikan array kosong.`,
+          `Client error (${error.response.status}) saat mengambil data visit plans. Mengembalikan objek kosong.`,
           error.response.data
         );
-        return []; 
+        return { data: [], total: 0 }; 
       }
     }
     console.error("Error fetching visit plans:", axiosError.response?.data || axiosError.message);
@@ -187,7 +195,7 @@ export const getVisitPlans = async (page: number): Promise<VisitPlan[]> => {
   }
 };
 
-export const submitVisitUpdate = async (name: string, newStatus: 'Checked In' | 'Completed', data?: { latitude?: number, longitude?: number, photo_file?: File | null }): Promise<boolean> => {
+export const submitVisitUpdate = async (name: string, newStatus: 'Checked In' | 'Completed', data?: { latitude?: number, longitude?: number, photo_file?: File | null, checkout_time?: string }): Promise<boolean> => {
   try {
     const formData = new FormData();
     formData.append('name', name);
@@ -199,8 +207,11 @@ export const submitVisitUpdate = async (name: string, newStatus: 'Checked In' | 
       if (data.photo_file) {
         formData.append('photo', data.photo_file); 
       }
+      if (data.checkout_time) {
+        formData.append('checkout_time', data.checkout_time);
+      }
     }
-
+    //console.log(formData);
     const response = await api.post('/api/method/sales_monitor.api.submit_visit_update', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -300,7 +311,7 @@ export const getWeeklyVisitSalesComparisonData = async (): Promise<WeeklyVisitSa
 export const getWeeklyCustomerOrderData = async (): Promise<WeeklyCustomerOrderData[]> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_weekly_customer_order_data');
-    const data = response.data.message || response.data.data;
+    const data = (response.data.message && response.data.message.data) || response.data.data;
     if (!Array.isArray(data)) {
       console.error("Backend did not return an array for weekly customer order data:", data);
       return [];
