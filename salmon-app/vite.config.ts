@@ -29,4 +29,19 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 2000, // Set to 1000 KB (1MB) to suppress the warning
   },
+  /* server: {
+    https: {
+      key: fs.readFileSync('localhost+1-key.pem'),
+      cert: fs.readFileSync('localhost+1.pem'),
+    },
+    port: 3000, // Opsional: Pastikan portnya 3000
+    proxy: {
+      // Proxy semua permintaan yang dimulai dengan '/api'
+      '/api': {
+        target: 'https://dev-erp.samkarsa.com',
+        changeOrigin: true,
+        secure: false, // Penting jika server target menggunakan sertifikat yang tidak tepercaya
+      }, zGwAaS39grpJogG1 , db_siumang_dev
+    }, 
+  }, */
 })

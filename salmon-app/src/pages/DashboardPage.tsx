@@ -74,7 +74,11 @@ const DashboardPage = () => {
 
       } catch (err: unknown) {
         if (err instanceof Error) {
-          setError(err.message || 'Failed to fetch dashboard data.');
+          if (err.message.includes('Could not find linked Sales Person for Employee')) {
+            setError('Karyawan perlu ditautkan ke Sales Person. Silakan hubungi administrator.');
+          } else {
+            setError(err.message || 'Failed to fetch dashboard data.');
+          }
         } else {
           setError('An unknown error occurred.');
         }

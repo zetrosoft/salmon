@@ -165,6 +165,7 @@ export const PAGE_LENGTH = 5;
 export interface VisitPlansResponse {
   data: VisitPlan[];
   total: number;
+  error_message?: string;
 }
 
 export const getVisitPlans = async (page: number): Promise<VisitPlansResponse> => { 
@@ -176,9 +177,15 @@ export const getVisitPlans = async (page: number): Promise<VisitPlansResponse> =
         limit_page_length: PAGE_LENGTH,
       },
     });
-    // Backend returns { data: [], total: 0 }
+
     const responseData = response.data.message || response.data;
-    return responseData.data ? responseData : { data: [], total: 0 };
+
+    return {
+      data: responseData.data || [],
+      total: responseData.total || 0,
+      error_message: responseData.error_message,
+    };
+
   } catch (error: unknown) {
     const axiosError = error as AxiosError<{ message: string }>;
     if (axios.isAxiosError(error) && error.response) {
@@ -283,13 +290,7 @@ export const getSalesActivityHistory = async (fromDate?: string, toDate?: string
 export const getDashboardData = async (): Promise<DashboardData> => {
   try {
     const response = await api.get('/api/method/sales_monitor.api.get_dashboard_data');
-    const dataToReturn = response.data.message || response.data.data;
-
-    if (dataToReturn && dataToReturn.status === 'error') {
-      throw new Error(dataToReturn.message || 'Failed to fetch dashboard data.');
-    }
-
-    return dataToReturn;
+    return response.data.message || response.data.data;
   } catch (error: unknown) {
     const axiosError = error as AxiosError<{ message: string }>;
     console.error("Error fetching dashboard data:", axiosError.response?.data || axiosError.message);
@@ -313,7 +314,7 @@ export const getWeeklyCustomerOrderData = async (): Promise<WeeklyCustomerOrderD
     const response = await api.get('/api/method/sales_monitor.api.get_weekly_customer_order_data');
     const data = (response.data.message && response.data.message.data) || response.data.data;
     if (!Array.isArray(data)) {
-      console.error("Backend did not return an array for weekly customer order data:", data);
+      console.warn("Backend did not return an array for weekly customer order data, returning empty array:", data);
       return [];
     }
     return data;
@@ -397,6 +398,22 @@ export const fetchCsrfToken = async (): Promise<string | null> => {
     return null;
   } catch (error) {
     console.error("Error fetching CSRF token:", error);
+    return null;
+  }
+};
+
+export const getCustomerMasterLocation = async (customer: string): Promise<{ latitude: number; longitude: number } | null> => {
+  try {
+    const response = await api.get('/api/method/sales_monitor.api.get_customer_master_location', {
+      params: { customer },
+    });
+    // The backend returns the location object directly or null if not found
+    return response.data.message || null;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching customer master location:", axiosError.response?.data || axiosError.message);
+    // In case of an error, we don't want to block the checkout, so we return null.
+    // The main logic will treat this as if there is no master location.
     return null;
   }
 };

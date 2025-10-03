@@ -90,7 +90,7 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
       {/* --- Footer --- */}
       <Box sx={{ p: 2, mt: 'auto', textAlign: 'center' }}>
         <Typography variant="caption" display="block" color="text.secondary">
-          Version 1.0.0
+          Version 1.0.1
         </Typography>
       </Box>
     </Box>

@@ -1,7 +1,7 @@
-import { Typography, Container, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton, Card, CardHeader, CardContent, CardActions, Chip, Skeleton, Tooltip } from '@mui/material';
+import { Typography, Container, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, CircularProgress, Alert, IconButton, Card, CardHeader, CardContent, CardActions, Chip, Skeleton, Tooltip, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { keyframes } from '@mui/system';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getVisitPlans, submitVisitUpdate, PAGE_LENGTH } from '../api/frappeApi';
+import { getVisitPlans, submitVisitUpdate, PAGE_LENGTH, getCustomerMasterLocation } from '../api/frappeApi';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import HistoryIcon from '@mui/icons-material/History';
 import StorefrontIcon from '@mui/icons-material/Storefront';
@@ -58,6 +58,22 @@ const ScheduleCardSkeleton = () => (
   </Card>
 );
 
+const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3; // metres
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+  const d = R * c; // in metres
+  return d;
+}
+
 const VisitSchedulePage = () => {
   const STATUS_ORDER = useMemo(() => ({
     "Checked In": 0,
@@ -97,8 +113,47 @@ const VisitSchedulePage = () => {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  
-  // Removed countdown states
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [activeDeviceId, setActiveDeviceId] = useState<string | undefined>(undefined);
+
+  const getCameras = useCallback(async () => {
+    try {
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = mediaDevices.filter(device => device.kind === 'videoinput');
+      setDevices(videoDevices);
+      if (videoDevices.length > 0 && !activeDeviceId) {
+        setActiveDeviceId(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error("Error enumerating devices:", err);
+    }
+  }, [activeDeviceId]);
+
+  const startCamera = useCallback(async () => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: activeDeviceId ? { exact: activeDeviceId } : undefined } });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.error("Camera access denied:", err);
+        setCheckoutError("Camera access is required. Please enable it in your browser settings.");
+      }
+    }
+  }, [activeDeviceId]);
+
+  useEffect(() => {
+    if (openCheckoutDialog) {
+      getCameras();
+    }
+  }, [openCheckoutDialog, getCameras]);
+
+  useEffect(() => {
+    if (activeDeviceId) {
+      startCamera();
+    }
+  }, [activeDeviceId, startCamera]);
 
   const sortPlans = useCallback((plans: VisitPlan[]) => {
     return plans.sort((a, b) => (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99));
@@ -121,6 +176,14 @@ const VisitSchedulePage = () => {
 
     try {
         const response = await getVisitPlans(pageToFetch); // getVisitPlans now returns { data, total }
+        
+        if (response.error_message) {
+            setError(response.error_message);
+            setHasMore(false);
+            setVisitPlans([]);
+            return;
+        }
+
         const newPlans = response.data;
         const totalCount = response.total; // Get total count from API response
 
@@ -154,7 +217,7 @@ const VisitSchedulePage = () => {
         setIsFetchingMore(false);
         //console.log('fetchVisitPlans finished. Loading states reset.'); // Debug log
     }
-  }, [employeeId, sortPlans, loading, isFetchingMore]); // Added loading and isFetchingMore to dependencies
+  }, [employeeId, sortPlans]); // Added loading and isFetchingMore to dependencies
 
   useEffect(() => {
     //console.log('useEffect for initial fetch triggered. employeeId:', employeeId); // Debug log
@@ -238,18 +301,7 @@ const VisitSchedulePage = () => {
     setCheckoutError(null);
     
     // Start camera and get location
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then(stream => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        })
-        .catch((err: unknown) => {
-          console.error("Camera access denied:", err);
-          setCheckoutError("Camera access is required. Please enable it in your browser settings.");
-        });
-    }
+    startCamera();
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -317,10 +369,40 @@ const handleConfirmCheckout = useCallback(async () => {
         setCheckoutError('Please ensure a photo has been taken and location is available.');
         return;
     }
+
     setCheckoutLoading(true);
     setCheckoutError(null);
 
-      try {
+    // --- VALIDATION GATE ---
+    try {
+        const plan = visitPlans.find(p => p.name === currentPlanName);
+        if (!plan) {
+            throw new Error("Could not find current visit plan details.");
+        }
+
+        const masterLocation = await getCustomerMasterLocation(plan.store_name);
+
+        if (masterLocation && masterLocation.latitude && masterLocation.longitude) {
+            const distance = getDistanceInMeters(
+                masterLocation.latitude,
+                masterLocation.longitude,
+                currentLocation.latitude,
+                currentLocation.longitude
+            );
+
+            if (distance > 10) {
+                setCheckoutError(`Check-out Gagal. Lokasi Anda (berjarak ${Math.round(distance)} meter) terlalu jauh dari lokasi master. Batas yang diizinkan adalah 10 meter.`);
+                setCheckoutLoading(false);
+                return; // Stop the checkout process
+            }
+        }
+    } catch (err) {
+        console.error("Error during master location check:", err);
+        // Soft fail: If the check fails, we still allow the user to check out.
+    }
+    // --- END OF VALIDATION GATE ---
+
+    try {
         const success = await submitVisitUpdate(
             currentPlanName,
             'Completed',
@@ -346,7 +428,7 @@ const handleConfirmCheckout = useCallback(async () => {
     } finally{
       setCheckoutLoading(false)
     }
-  },[currentPlanName,currentLocation,photoFile]);
+  },[currentPlanName,currentLocation,photoFile, visitPlans]);
 
   const formatDateTime = useCallback((dateTimeString: string | undefined, plannedDateTimeString: string | undefined) => {
     if (!dateTimeString) return 'N/A';
@@ -482,6 +564,21 @@ const handleConfirmCheckout = useCallback(async () => {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography>Take Photo:</Typography>
             <video ref={videoRef} style={{ width: '100%', border: '1px solid #ccc' }} autoPlay playsInline />
+            {devices.length > 1 && (
+              <FormControl fullWidth>
+                <InputLabel id="camera-select-label">Camera</InputLabel>
+                <Select
+                  labelId="camera-select-label"
+                  value={activeDeviceId || ''}
+                  label="Camera"
+                  onChange={(e) => setActiveDeviceId(e.target.value as string)}
+                >
+                  {devices.map(device => (
+                    <MenuItem key={device.deviceId} value={device.deviceId}>{device.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
             <Button variant="outlined" onClick={takePhoto} disabled={!videoRef.current?.srcObject}>Capture Photo</Button>
             {photoDataUrl && <img src={photoDataUrl} alt="Captured" style={{ width: '100%', border: '1px solid #ccc' }} />}
             <canvas ref={canvasRef} style={{ display: 'none' }} />
