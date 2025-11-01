@@ -20,6 +20,7 @@ const VisitPlanner = lazy(() => import('./pages/VisitPlanner'));
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [employeeName, setEmployeeName] = useState<string | null>(null); // New state for employee name
   const [isApiInitialized, setIsApiInitialized] = useState(false);
 
   useEffect(() => {
@@ -29,19 +30,23 @@ function App() {
       
       const loggedInStatus = sessionStorage.getItem('isLoggedIn');
       const storedEmployeeId = sessionStorage.getItem('employeeId');
+      const storedEmployeeName = sessionStorage.getItem('employeeName'); // Ambil employeeName
       if (loggedInStatus === 'true' && storedEmployeeId) {
         setIsLoggedIn(true);
         setEmployeeId(storedEmployeeId);
+        setEmployeeName(storedEmployeeName); // Set employeeName
       }
     }
     init();
   }, []);
 
-  const handleLoginSuccess = useCallback((_userId: string, employeeId: string) => {
+  const handleLoginSuccess = useCallback((_userId: string, employeeId: string, employeeName: string) => {
     setIsLoggedIn(true);
     setEmployeeId(employeeId);
+    setEmployeeName(employeeName); // Simpan employeeName
     sessionStorage.setItem('isLoggedIn', 'true');
     sessionStorage.setItem('employeeId', employeeId);
+    sessionStorage.setItem('employeeName', employeeName); // Simpan employeeName ke sessionStorage
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -50,6 +55,7 @@ function App() {
     setEmployeeId(null);
     sessionStorage.removeItem('isLoggedIn');
     sessionStorage.removeItem('employeeId');
+    sessionStorage.removeItem('employeeName'); // Hapus employeeName
   }, []);
 
   if (!isApiInitialized) {
@@ -64,7 +70,7 @@ function App() {
           <Routes>
             <Route path="/login" element={isLoggedIn ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />} />
             {isLoggedIn ? (
-              <Route path="/" element={<Layout onLogout={handleLogout} employeeId={employeeId} />}>
+              <Route path="/" element={<Layout onLogout={handleLogout} employeeId={employeeId} employeeName={employeeName} />}>
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="schedule" element={<VisitSchedulePage />} />

@@ -110,7 +110,8 @@ export const initializeApi = async () => {
 interface LoginResponse {
   success: boolean;
   message?: string;
-  salesName?: string;
+  employeeId?: string;   // Mengganti salesName
+  employeeName?: string; // Menambahkan employeeName
   userId?: string;
 }
 
@@ -122,6 +123,7 @@ export const login = async (username: string, password: string): Promise<LoginRe
     });
 
     const responseData = response.data.message;
+    // console.log("DEBUG frappeApi: Raw responseData from backend:", responseData); // Tambahkan log ini
 
     if (responseData.status === 'success') {
       const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
@@ -132,7 +134,8 @@ export const login = async (username: string, password: string): Promise<LoginRe
       sessionStorage.setItem('frappe_full_name', responseData.full_name);
       return {
         success: true,
-        salesName: responseData.employee_id, // Assuming employee_id is the salesName
+        employeeId: responseData.employee_id,
+        employeeName: responseData.employee_name,
         userId: responseData.user_id,
       };
     } else {
@@ -415,5 +418,65 @@ export const getCustomerMasterLocation = async (customer: string): Promise<{ lat
     // In case of an error, we don't want to block the checkout, so we return null.
     // The main logic will treat this as if there is no master location.
     return null;
+  }
+};
+
+export const updateCustomerLocation = async (customer: string, latitude: number, longitude: number): Promise<{ status: string; message: string }> => {
+  try {
+    const response = await api.post('/api/method/sales_monitor.api.update_customer_location', {
+      customer,
+      latitude,
+      longitude,
+    });
+    return response.data.message;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error updating customer location:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to update customer location.');
+  }
+};
+
+// Define interface for UserProfileData
+interface UserProfileData {
+  employee_name: string;
+  designation: string;
+  department: string;
+  company_email: string;
+  cell_number: string;
+  image?: string;
+}
+
+interface UserProfileResponse {
+  status: string;
+  data?: UserProfileData;
+  message?: string;
+}
+
+export const get_user_profile_data = async (): Promise<UserProfileResponse> => {
+  try {
+    const response = await api.get('/api/method/sales_monitor.api.get_user_profile_data');
+    return response.data.message;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching user profile data:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch user profile data.');
+  }
+};
+
+interface SalesPersonCustomersResponse {
+  status: string;
+  data?: string[]; // Array of customer names
+  message?: string;
+}
+
+export const get_sales_person_customers = async (): Promise<SalesPersonCustomersResponse> => {
+  try {
+    const response = await api.get('/api/method/sales_monitor.api.get_sales_person_customers');
+    // console.log("DEBUG frappeApi: get_sales_person_customers raw response:", response.data); // Tambahkan log ini
+    return response.data.message;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error fetching sales person customers:", axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || 'Failed to fetch sales person customers.');
   }
 };

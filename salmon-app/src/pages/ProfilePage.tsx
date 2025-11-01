@@ -1,6 +1,7 @@
-import { Box, Typography, Container, Paper, Avatar } from '@mui/material';
+import { Box, Typography, Container, Paper, Avatar, CircularProgress, Alert } from '@mui/material';
 import { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { get_user_profile_data } from '../api/frappeApi'; // Import API baru
 
 // This interface is provided by the Layout component via context
 interface OutletContext {
@@ -9,10 +10,12 @@ interface OutletContext {
 
 // Define the structure of the user details
 interface UserDetails {
-  employeeId: string | null;
-  name: string | null;
-  email: string | null;
-  initial: string;
+  employee_name: string;
+  designation: string;
+  department: string;
+  company_email: string;
+  cell_number: string;
+  image?: string; // URL gambar profil
 }
 
 const ProfilePage = () => {
@@ -21,45 +24,74 @@ const ProfilePage = () => {
   
   // State to hold user details
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Retrieve user data from sessionStorage
-    const fullName = sessionStorage.getItem('frappe_full_name');
-    const userEmail = sessionStorage.getItem('frappe_user_id'); // user_id is the email
+    const fetchUserProfile = async () => {
+      if (!employeeId) {
+        setError("Employee ID not available.");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await get_user_profile_data(); // Panggil API baru
+        if (response.status === "success" && response.data) {
+          setUserDetails(response.data);
+        } else {
+          setError(response.message || "Failed to fetch user profile.");
+        }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // Set all details in state, including employeeId from context
-    setUserDetails({
-      employeeId: employeeId,
-      name: fullName,
-      email: userEmail,
-      initial: fullName ? fullName.charAt(0).toUpperCase() : (employeeId ? employeeId.charAt(0) : '?'),
-    });
-    
+    fetchUserProfile();
   }, [employeeId]); // Depend on employeeId to re-run if it changes
 
   return (
     <Container maxWidth="sm" sx={{ mt: 4 }}>
-      {/* Add responsive padding to the Paper component */}
-      <Paper elevation={3} sx={{ padding: { xs: 2, sm: 3, md: 4 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Avatar sx={{ width: 100, height: 100, mb: 2, fontSize: '3rem' }}>
-          {userDetails?.initial}
-        </Avatar>
-        
-        {/* Display Employee ID */}
-        <Typography variant="h6" color="text.secondary">
-          {userDetails?.employeeId}
-        </Typography>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>
+      ) : error ? (
+        <Alert severity="error">{error}</Alert>
+      ) : userDetails ? (
+        <Paper elevation={3} sx={{ padding: { xs: 2, sm: 3, md: 4 }, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <Avatar
+            alt={userDetails.employee_name}
+            src={userDetails.image || undefined} // Gunakan URL gambar jika ada
+            sx={{ width: 100, height: 100, mb: 2, fontSize: '3rem' }}
+          >
+            {!userDetails.image && userDetails.employee_name ? userDetails.employee_name.charAt(0).toUpperCase() : ''}
+          </Avatar>
+          
+          <Typography variant="h5" component="h1" gutterBottom>
+            {userDetails.employee_name}
+          </Typography>
 
-        {/* Display Full Name */}
-        <Typography variant="h5" component="h1" gutterBottom>
-          {userDetails?.name}
-        </Typography>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            {userDetails.designation}
+          </Typography>
 
-        {/* Display Email */}
-        <Typography variant="body1" color="text.secondary" gutterBottom>
-          {userDetails?.email}
-        </Typography>
-      </Paper>
+          <Typography variant="body1" color="text.secondary" gutterBottom>
+            {userDetails.department}
+          </Typography>
+
+          <Typography variant="body1" color="text.secondary" gutterBottom>
+            Email: {userDetails.company_email}
+          </Typography>
+
+          <Typography variant="body1" color="text.secondary" gutterBottom>
+            Telepon: {userDetails.cell_number}
+          </Typography>
+        </Paper>
+      ) : (
+        <Alert severity="info">No user profile data available.</Alert>
+      )}
     </Container>
   );
 };

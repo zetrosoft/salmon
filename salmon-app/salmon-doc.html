@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ringkasan Alur dan Logika Aplikasi Sales Monitor & Salmon</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            margin: 2em;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3, h4 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 8px;
+        }
+        code {
+            background-color: #ecf0f1;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-family: "Courier New", Courier, monospace;
+            color: #e74c3c;
+        }
+        ul, ol {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        strong {
+            color: #2980b9;
+        }
+        em {
+            color: #8e44ad;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ringkasan Alur dan Logika Aplikasi</h1>
+
+        <h2>1. <code>sales_monitor</code> (Aplikasi Backend - Frappe)</h2>
+        <p>Aplikasi ini berfungsi sebagai <em>backend</em> dan pusat data untuk seluruh proses monitoring sales.</p>
+
+        <h4>Struktur Data (DocTypes):</h4>
+        <ul>
+            <li><code>Sales Visit Plan</code>: Dokumen utama untuk merencanakan kunjungan sales. Isinya adalah siapa sales yang akan pergi, tanggal rencana, dan daftar pelanggan yang akan dikunjungi. Dokumen ini memiliki alur <em>submit</em> dan <em>cancel</em>.</li>
+            <li><code>Sales Activity Monitoring</code>: Dokumen ini mencatat <em>setiap aktivitas</em> yang terjadi selama kunjungan, dibuat saat "Check In" dan diperbarui saat "Check Out". Menyimpan waktu, durasi, foto, dan koordinat GPS.</li>
+        </ul>
+
+        <h4>Logika & API (<code>api.py</code>):</h4>
+        <ul>
+            <li><strong>Autentikasi</strong>: Fungsi <code>pwa_login</code> khusus untuk login <code>salmon-app</code> ke Frappe.</li>
+            <li><strong>Pengambilan Data Kunjungan</strong>: <code>get_sales_visit_plans</code> adalah API utama untuk <code>salmon-app</code> menampilkan jadwal kunjungan.</li>
+            <li><strong>Update Status Kunjungan</strong>: <code>submit_visit_update</code> adalah API krusial untuk proses "Check In" dan "Check Out".</li>
+            <li><strong>API Dasbor & Laporan</strong>: Menyediakan data teragregasi untuk dasbor dan laporan di <code>salmon-app</code>.</li>
+        </ul>
+
+        <h2>2. <code>salmon-app</code> (Aplikasi Frontend - React/TypeScript)</h2>
+        <p>Ini adalah Progressive Web App (PWA) yang digunakan oleh tim sales di lapangan dan sepenuhnya bergantung pada API dari <code>sales_monitor</code>.</p>
+
+        <h4>Alur Aplikasi:</h4>
+        <ol>
+            <li><strong>Inisialisasi & Login</strong>: Aplikasi memuat konfigurasi URL backend, lalu pengguna login melalui endpoint <code>pwa_login</code>.</li>
+            <li><strong>Navigasi</strong>: Setelah login, pengguna diarahkan ke dasbor dan dapat bernavigasi ke halaman lain seperti Jadwal, Laporan, dll.</li>
+            <li><strong>Dasbor</strong>: Menampilkan ringkasan data dari berbagai API dasbor di backend.</li>
+            <li><strong>Jadwal & Check-in/out</strong>: Menampilkan jadwal dari <code>get_sales_visit_plans</code>. Proses check-in/out memanggil API <code>submit_visit_update</code> dengan data relevan (GPS, foto).</li>
+            <li><strong>Input Rencana</strong>: Sales dapat membuat rencana kunjungan baru melalui halaman "Visit Planner" yang memanggil API <code>create_sales_visit_plan</code>.</li>
+        </ol>
+
+        <h2>Kesimpulan Alur Terintegrasi</h2>
+        <ol>
+            <li><strong>Perencanaan</strong>: Rencana dibuat di Frappe atau melalui <code>salmon-app</code>.</li>
+            <li><strong>Eksekusi</strong>: Sales membuka <code>salmon-app</code> di lapangan, login, dan melihat jadwal.</li>
+            <li><strong>Check-in</strong>: Sales tiba di lokasi dan melakukan "Check In". Aplikasi mengirim data ke backend untuk membuat catatan aktivitas.</li>
+            <li><strong>Check-out</strong>: Sales selesai, mengambil foto, dan "Check Out". Aplikasi mengirim data lagi untuk melengkapi catatan aktivitas.</li>
+            <li><strong>Monitoring</strong>: Manajer memantau progres secara real-time melalui laporan di Frappe.</li>
+        </ol>
+        <p>Sistem ini memisahkan dengan jelas antara <strong>logika bisnis dan data (<code>sales_monitor</code>)</strong> dengan <strong>antarmuka pengguna dan interaksi lapangan (<code>salmon-app</code>)</strong>.</p>
+    </div>
+</body>
+</html>

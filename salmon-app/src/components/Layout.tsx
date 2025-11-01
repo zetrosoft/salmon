@@ -9,11 +9,12 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import PersonIcon from '@mui/icons-material/Person';
 import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt';
 import { useState, Suspense, useRef } from 'react'; // Import useRef
-import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
+import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
   onLogout: () => void;
   employeeId: string | null;
+  employeeName: string | null; // New prop for employee name
 }
 
 const drawerWidth = 200;
@@ -21,7 +22,7 @@ const drawerWidth = 200;
 const nameMap: { [key: string]: string } = {
   'dashboard': 'Dashboard',
   'schedule': 'Visit Schedule',
-  'activity': 'Visit Activity',
+  // 'activity': 'Visit Activity',
   'report': 'Activity Report',
   'profile': 'User Profile',
   'input-visit': 'Create Planning',
@@ -35,9 +36,10 @@ const PageLoader = () => (
   </Box>
 );
 
-const Layout = ({ onLogout, employeeId }: LayoutProps) => {
+const Layout = ({ onLogout, employeeId, employeeName }: LayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate(); // Declare navigate hook
   const pathnames = location.pathname.split('/').filter((x) => x);
   const menuButtonRef = useRef<HTMLButtonElement>(null); // Ref for the menu button
 
@@ -69,10 +71,10 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
           <AddLocationAltIcon sx={{ mr: 1 }} />
           <ListItemText primary="Create Planning" />
         </ListItemButton>
-        <ListItemButton component={RouterLink} to="/activity" selected={location.pathname.startsWith('/activity')}>
+        {/* <ListItemButton component={RouterLink} to="/activity" selected={location.pathname.startsWith('/activity')}>
           <HistoryIcon sx={{ mr: 1 }} />
           <ListItemText primary="Visit Activity" />
-        </ListItemButton>
+        </ListItemButton> */}
         <ListItemButton component={RouterLink} to="/report" selected={location.pathname.startsWith('/report')}>
           <BarChartIcon sx={{ mr: 1 }} />
           <ListItemText primary="Activity Report" />
@@ -90,7 +92,7 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
       {/* --- Footer --- */}
       <Box sx={{ p: 2, mt: 'auto', textAlign: 'center' }}>
         <Typography variant="caption" display="block" color="text.secondary">
-          Version 1.0.1
+          Version 1.0.2
         </Typography>
       </Box>
     </Box>
@@ -138,9 +140,24 @@ const Layout = ({ onLogout, employeeId }: LayoutProps) => {
                 </Breadcrumbs>
             </Box>
           </Box>
-          <Typography sx={{ mr: 2, display: { xs: 'none', sm: 'block' }, minHeight: '24px' }}>
-            {employeeId ? `Hi, ${employeeId}` : ''}
-          </Typography>
+          <Box
+            sx={{
+              mr: 2,
+              display: { xs: 'none', sm: 'flex' },
+              alignItems: 'center',
+              cursor: 'pointer',
+              minHeight: '24px',
+              '&:hover': {
+                opacity: 0.8,
+              },
+            }}
+            onClick={() => navigate('/profile')} // Navigate to profile page
+          >
+            <Typography variant="body1" color="inherit" sx={{ mr: 1 }}>
+              {employeeName ? `Hi, ${employeeName}` : ''}
+            </Typography>
+            <PersonIcon sx={{ fontSize: 20 }} /> {/* Add a person icon */}
+          </Box>
           <IconButton color="inherit" onClick={onLogout} title="Log Out">
             <LogoutIcon />
           </IconButton>

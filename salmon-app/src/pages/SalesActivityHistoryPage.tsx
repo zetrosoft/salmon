@@ -1,6 +1,6 @@
-import { AppBar, Toolbar, Typography, Container, Box, CircularProgress, Alert, IconButton, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Box, CircularProgress, Alert, IconButton, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Autocomplete } from '@mui/material';
 import { useState, useEffect } from 'react';
-import { getSalesActivityHistory } from '../api/frappeApi';
+import { getSalesActivityHistory, get_sales_person_customers } from '../api/frappeApi'; // Import API baru
 import { useOutletContext } from 'react-router-dom';
 import type { SalesActivity } from '../types';
 
@@ -16,6 +16,7 @@ const SalesActivityHistoryPage = () => {
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [customerFilter, setCustomerFilter] = useState<string>('');
+  const [customerOptions, setCustomerOptions] = useState<string[]>([]); // New state for customer options
 
   useEffect(() => {
     const today = new Date();
@@ -23,6 +24,23 @@ const SalesActivityHistoryPage = () => {
     setFromDate(lastMonth.toISOString().split('T')[0]);
     setToDate(new Date().toISOString().split('T')[0]);
   }, []);
+
+  useEffect(() => {
+    const fetchCustomerOptions = async () => {
+      try {
+        const response = await get_sales_person_customers();
+        // console.log("DEBUG SalesActivityHistoryPage: get_sales_person_customers response:", response); // Tambahkan log ini
+        if (response.status === "success" && response.data) {
+          setCustomerOptions(response.data);
+        } else {
+          setError(response.message || "Failed to fetch customer options.");
+        }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred while fetching customer options.");
+      }
+    };
+    fetchCustomerOptions();
+  }, []); // Run once on component mount
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -86,10 +104,13 @@ const SalesActivityHistoryPage = () => {
             shrink: true,
           }}
         />
-        <TextField
-          label="Customer"
+        <Autocomplete
+          options={customerOptions}
           value={customerFilter}
-          onChange={(e) => setCustomerFilter(e.target.value)}
+          onChange={(event, newValue) => {
+            setCustomerFilter(newValue || '');
+          }}
+          renderInput={(params) => <TextField {...params} label="Customer" />}
           sx={{ flexGrow: 1 }}
         />
       </Box>

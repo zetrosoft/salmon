@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { login, fetchCsrfToken } from '../api/frappeApi';
 
 interface LoginPageProps {
-  onLoginSuccess: (userId: string, employeeId: string) => void;
+  onLoginSuccess: (userId: string, employeeId: string, employeeName: string) => void;
 }
 
 const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
@@ -22,9 +22,11 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
       await fetchCsrfToken();
 
       const response = await login(username, password);
-      if (response.success && response.userId && response.salesName) {
-        onLoginSuccess(response.userId, response.salesName);
+      // console.log("DEBUG LoginPage: Response from login API:", response); // Tambahkan log ini
+      if (response.success && response.userId && response.employeeId && response.employeeName) { // Perbaiki employee_id menjadi employeeId, employee_name menjadi employeeName
+        onLoginSuccess(response.userId, response.employeeId, response.employeeName);
       } else {
+        // console.log("DEBUG LoginPage: Login condition failed. Response:", response); // Tambahkan log ini
         const backendMessage = typeof response.message === 'string' ? response.message : '';
         if (backendMessage === 'Invalid login credentials.') {
           setError('Invalid username or password.');
