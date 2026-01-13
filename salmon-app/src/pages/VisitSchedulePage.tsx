@@ -292,8 +292,7 @@ const VisitSchedulePage = () => {
    * @state distanceConfirm
    * @description Mengontrol visibilitas dialog konfirmasi jarak.
    */
-  const [distanceConfirm, setDistanceConfirm] = useState({ isOpen: false, distance: 0 });
-  /**
+     const [distanceConfirm, setDistanceConfirm] = useState<{ isOpen: boolean; distance: number; type?: 'too_far' | 'almost_there' }>({ isOpen: false, distance: 0 });  /**
    * @state isInitialLoading
    * @description Menunjukkan apakah proses loading awal (izin kamera/lokasi, pengecekan jarak) sedang berlangsung.
    */
@@ -583,55 +582,83 @@ const VisitSchedulePage = () => {
 
   
 
-                    if (masterLocation && masterLocation.latitude && masterLocation.longitude) {
+                                        if (masterLocation && masterLocation.latitude && masterLocation.longitude) {
 
   
 
-                        const distance = getDistanceInMeters(masterLocation.latitude, masterLocation.longitude, liveLocation.latitude, liveLocation.longitude);
+                    
 
   
 
-          
+                                            const distance = getDistanceInMeters(masterLocation.latitude, masterLocation.longitude, liveLocation.latitude, liveLocation.longitude);
 
   
 
-                        if (distance > 5) {
+                    
 
   
 
-                            setIsInitialLoading(false);
+                                            if (distance > 100) { // Jarak terlalu jauh
 
   
 
-                            setDistanceConfirm({ isOpen: true, distance: distance });
+                                                setIsInitialLoading(false);
 
   
 
-                            
+                                                setDistanceConfirm({ isOpen: true, distance: distance, type: 'too_far' }); // Menambahkan 'type'
 
   
 
-                            // Crucially, stop the camera stream if the main dialog won\'t open yet
+                                                // Crucially, stop the camera stream if the main dialog won\'t open yet
 
   
 
-                            if (currentCameraStream) currentCameraStream.getTracks().forEach(track => track.stop());
+                                                if (currentCameraStream) currentCameraStream.getTracks().forEach(track => track.stop());
 
   
 
-                            setActiveCameraStream(null); // Clear state
+                                                setActiveCameraStream(null); // Clear state
 
   
 
-                            return;
+                                                return;
 
   
 
-                        }
+                                            } else if (distance > 5) { // Jarak sudah dekat (antara 5 dan 100 meter)
 
   
 
-                    }
+                                                setIsInitialLoading(false);
+
+  
+
+                                                setDistanceConfirm({ isOpen: true, distance: distance, type: 'almost_there' }); // Menambahkan 'type'
+
+  
+
+                                                // Crucially, stop the camera stream if the main dialog won won't open yet
+
+  
+
+                                                if (currentCameraStream) currentCameraStream.getTracks().forEach(track => track.stop());
+
+  
+
+                                                setActiveCameraStream(null); // Clear state
+
+  
+
+                                                return;
+
+  
+
+                                            }
+
+  
+
+                                        }
 
   
 
@@ -702,13 +729,13 @@ const VisitSchedulePage = () => {
    * @description Menutup dialog check-out dan mereset state terkait.
    *              Memastikan stream kamera dihentikan.
    */
-  const handleCloseCheckout = () => {
+  const handleCloseCheckout = useCallback(() => {
     // console.log("DEBUG: handleCloseCheckout triggered. Stopping camera stream.");
     setOpenCheckoutDialog(false);
     setCurrentPlanName(null);
     setIsVideoStreamReady(false); // Reset video stream ready state
     // Stream stopping is now handled by useEffect based on openCheckoutDialog state
-  };
+  }, []); // No dependencies needed as it only sets state and state setters are stable
 
   /**
    * @function takePhoto
@@ -717,16 +744,16 @@ const VisitSchedulePage = () => {
   const takePhoto = useCallback(() => {
     // console.log("DEBUG: takePhoto called. videoRef.current:", videoRef.current, "canvasRef.current:", canvasRef.current);
     if (videoRef.current && canvasRef.current) {
-        const video = video.current;
-        const canvas = canvas.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
+        const videoElement = videoRef.current;
+        const canvasElement = canvasRef.current;
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        const ctx = canvasElement.getContext('2d');
         if (ctx) {
-            ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-            const dataUrl = canvas.toDataURL('image/jpeg');
+            ctx.drawImage(videoElement, 0, 0, videoElement.videoWidth, videoElement.videoHeight);
+            const dataUrl = canvasElement.toDataURL('image/jpeg');
             setPhotoDataUrl(dataUrl);
-            canvas.toBlob((blob) => {
+            canvasElement.toBlob((blob: Blob | null) => {
                 if (blob) setPhotoFile(new File([blob], 'captured_photo.jpeg', { type: 'image/jpeg' }));
             }, 'image/jpeg');
         }
@@ -739,7 +766,7 @@ const VisitSchedulePage = () => {
    *              (termasuk lokasi dan foto) ke server.
    * @async
    */
-  const proceedWithCheckout = async () => {
+  const proceedWithCheckout = useCallback(async () => {
     if (!currentLocation || !currentPlanName || !photoFile) {
         setCheckoutError('Pastikan foto sudah diambil dan lokasi tersedia.');
         setCheckoutLoading(false);
@@ -758,7 +785,7 @@ const VisitSchedulePage = () => {
     } finally {
         setCheckoutLoading(false);
     }
-  };
+  }, [currentLocation, currentPlanName, photoFile, handleCloseCheckout, fetchVisitPlans]);
 
   /**
    * @function handleAcceptDistanceUpdate
@@ -813,7 +840,7 @@ const VisitSchedulePage = () => {
         setCheckoutError(err instanceof Error ? err.message : 'Gagal memvalidasi lokasi.');
         setCheckoutLoading(false);
     }
-  }, [currentPlanName, currentLocation, photoFile, visitPlans]);
+  }, [currentPlanName, currentLocation, photoFile, visitPlans, proceedWithCheckout]);
 
   /**
    * @function handleNavigate
@@ -953,15 +980,60 @@ const VisitSchedulePage = () => {
       <Dialog open={distanceConfirm.isOpen} onClose={() => setDistanceConfirm({ isOpen: false, distance: 0 })}>
         <DialogTitle>Lokasi Terlalu Jauh</DialogTitle>
         <DialogContent>
-            <DialogContentText>
-                Lokasi Anda berjarak sekitar <Typography component="span" sx={{ fontWeight: 'bold' }}>{formatDistance(distanceConfirm.distance)}</Typography> dari lokasi customer.
-                <br /><br />
-                Apakah Anda ingin memperbarui lokasi customer dengan lokasi Anda saat ini? Atau silahkan berjalan lagi untuk mendapatkan lokasi yang sesuai.
-            </DialogContentText>
+            {(() => {
+                const plan = visitPlans.find(p => p.name === currentPlanName);
+                const customerName = plan?.store_name || "customer";
+                const customerAddress = plan?.address || "alamat tidak tersedia";
+
+                const FormattedCustomerName = (
+                    <Tooltip title={customerAddress} arrow>
+                        <Typography component="span" sx={{ fontWeight: 'bold' }}>
+                            {customerName}
+                        </Typography>
+                    </Tooltip>
+                );
+
+                let contentToRender;
+
+                if (distanceConfirm.type === 'too_far') {
+                    contentToRender = (
+                        <>
+                            Lokasi Anda berjarak sekitar <Typography component="span" sx={{ fontWeight: 'bold' }}>{formatDistance(distanceConfirm.distance)}</Typography> dari lokasi customer.
+                            <br /><br />
+                            Lokasi Anda terlalu jauh dengan {FormattedCustomerName}. Silahkan terus berjalan mendekat.
+                            <br />
+                            Gunakan button refresh untuk memperbaharui.
+                        </>
+                    );
+                } else if (distanceConfirm.type === 'almost_there') {
+                    contentToRender = (
+                        <>
+                            Lokasi Anda berjarak sekitar <Typography component="span" sx={{ fontWeight: 'bold' }}>{formatDistance(distanceConfirm.distance)}</Typography> dari lokasi customer.
+                            <br /><br />
+                            Terus melangkah lagi lokasi anda sudah dekat.
+                            <br />
+                            Gunakan button refresh untuk memperbaharui.
+                        </>
+                    );
+                } else {
+                    contentToRender = (
+                        <>
+                            Lokasi Anda berjarak sekitar <Typography component="span" sx={{ fontWeight: 'bold' }}>{formatDistance(distanceConfirm.distance)}</Typography> dari lokasi customer.
+                            <br /><br />
+                            Silahkan berjalan lagi untuk mendapatkan lokasi yang sesuai.
+                        </>
+                    );
+                }
+
+                return (
+                    <DialogContentText>
+                        {contentToRender}
+                    </DialogContentText>
+                );
+            })()}
         </DialogContent>
         <DialogActions>
-            <Button onClick={() => window.location.reload()}>Refresh</Button>
-            <Button onClick={handleAcceptDistanceUpdate} variant="contained" autoFocus>Ya, Update Lokasi</Button>
+            <Button onClick={() => window.location.reload()} color="primary">Refresh</Button>
         </DialogActions>
       </Dialog>
 
