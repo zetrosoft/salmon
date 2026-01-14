@@ -16,6 +16,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ActivityReportPage = lazy(() => import('./pages/ActivityReportPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const VisitPlanner = lazy(() => import('./pages/VisitPlanner'));
+const AddCustomerPage = lazy(() => import('./pages/AddCustomerPage'));
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -78,6 +79,7 @@ function App() {
                 <Route path="report" element={<ActivityReportPage />} />
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="input-visit" element={<VisitPlanner />} />
+                <Route path="add-customer" element={<AddCustomerPage />} />
                 <Route path="history/:customer?" element={<SalesActivityHistoryPage />} />
               </Route>
             ) : (

@@ -25,7 +25,10 @@ import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
 import moment from 'moment';
 import type { Moment } from 'moment';
 
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+
 import { getEmployeeId, getCustomers, getCustomerAddress, createSalesVisitPlan } from '../api/frappeApi';
+import CreateCustomerModal from '../components/CreateCustomerModal';
 
 // --- Helper Hook for Debouncing ---
 function useDebounce<T>(value: T, delay: number): T {
@@ -40,6 +43,7 @@ function useDebounce<T>(value: T, delay: number): T {
   }, [value, delay]);
   return debouncedValue;
 }
+
 
 
 interface SalesVisitPlanItem {
@@ -75,6 +79,9 @@ const VisitPlanner = () => {
   const [customerInputValue, setCustomerInputValue] = useState('');
   const [isCustomerLoading, setIsCustomerLoading] = useState(false);
   const debouncedSearchTerm = useDebounce(customerInputValue, 500);
+
+  // --- State for New Customer Modal ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
 
   const [pageLoading, setPageLoading] = useState(true);
@@ -116,9 +123,14 @@ const VisitPlanner = () => {
     // Fetch customers when dropdown is opened or search term changes
     const fetchCustomers = async () => {
         setIsCustomerLoading(true);
+        // Also include the current input value to ensure it's in the options if it's a valid customer
         const newOptions = await getCustomers(debouncedSearchTerm);
         if (active) {
-            setCustomerOptions(newOptions);
+            let updatedOptions = [...newOptions];
+            if (currentVisitItem.customer && !newOptions.includes(currentVisitItem.customer)) {
+                updatedOptions = [currentVisitItem.customer, ...newOptions];
+            }
+            setCustomerOptions(updatedOptions);
             setIsCustomerLoading(false);
         }
     };
@@ -127,14 +139,16 @@ const VisitPlanner = () => {
     return () => {
         active = false;
     };
-  }, [debouncedSearchTerm, isCustomerOpen]);
+  }, [debouncedSearchTerm, isCustomerOpen, currentVisitItem.customer]);
 
 
-  const handleCustomerSelect = useCallback(async (_event: React.SyntheticEvent, newValue: string | null) => {
+  const handleCustomerSelect = useCallback(async (_event: React.SyntheticEvent | null, newValue: string | null) => {
     if (!newValue) {
       setCurrentVisitItem(prev => ({ ...prev, customer: '', address: '' }));
+      setCustomerInputValue('');
       return;
     }
+    setCustomerInputValue(newValue);
     setCurrentVisitItem(prev => ({ ...prev, customer: newValue, address: 'Loading address...' }));
     try {
       const address = await getCustomerAddress(newValue);
@@ -145,6 +159,13 @@ const VisitPlanner = () => {
       setCurrentVisitItem(prev => ({ ...prev, address: 'Failed to fetch address.' }));
     }
   }, []);
+
+  const handleCreateCustomerSuccess = (newCustomerName: string) => {
+    // Directly update the state and trigger address fetch
+    handleCustomerSelect(null, newCustomerName);
+    setIsModalOpen(false);
+  };
+
 
   const addVisitPlanItem = () => {
     if (!currentVisitItem.customer || !currentVisitItem.visit_time) {
@@ -211,6 +232,13 @@ const VisitPlanner = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterMoment}>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        
+        <CreateCustomerModal 
+            open={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSuccess={handleCreateCustomerSuccess}
+        />
+
         <Paper elevation={3} sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
           <Typography variant="h5" gutterBottom>Create Planning</Typography>
           
@@ -241,8 +269,8 @@ const VisitPlanner = () => {
 
           <Box sx={{ border: '1px solid #ddd', p: { xs: 2, sm: 3 }, borderRadius: 2, mb: 4 }}>
             <Typography variant="h6" gutterBottom>Add Visit Detail</Typography>
-            <Grid container spacing={2} alignItems="flex-start">
-              <Grid item xs={12} md={12} sm={12}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={10} md={11}>
                 <Autocomplete
                   fullWidth
                   open={isCustomerOpen}
@@ -252,6 +280,7 @@ const VisitPlanner = () => {
                   getOptionLabel={(option) => option}
                   options={customerOptions}
                   loading={isCustomerLoading}
+                  inputValue={customerInputValue}
                   onInputChange={(event, newInputValue) => {
                     setCustomerInputValue(newInputValue);
                   }}
@@ -276,10 +305,21 @@ const VisitPlanner = () => {
                   )}
                 />
               </Grid>
+              <Grid item xs={12} sm={2} md={1}>
+                <Button 
+                  variant="outlined" 
+                  onClick={() => setIsModalOpen(true)} 
+                  fullWidth
+                  sx={{ height: '56px' }}
+                  title="Create New Customer"
+                >
+                  <AddCircleOutlineIcon />
+                </Button>
+              </Grid>
               <Grid item xs={12}>
                 <TextField label="Address" value={currentVisitItem.address} multiline rows={1} fullWidth InputProps={{ readOnly: true }} />
               </Grid>
-              <Grid item xs={12} md={2} sm={2}>
+              <Grid item xs={12} sm={6} md={3}>
                 <TimePicker
                   label="Visit Time"
                   value={currentVisitItem.visit_time}
@@ -288,7 +328,7 @@ const VisitPlanner = () => {
                   sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              <Grid item xs={12} sm={6} md={9}>
                 <TextField
                   label="Notes"
                   value={currentVisitItem.notes}

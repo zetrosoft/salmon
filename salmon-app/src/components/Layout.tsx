@@ -1,5 +1,5 @@
-
-import { AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItemButton, ListItemText, Box, CssBaseline, Breadcrumbs, Link as MuiLink, Divider, CircularProgress } from '@mui/material';
+import { AppBar, Toolbar, Typography, IconButton, Drawer, List, ListItemButton, ListItemText, CssBaseline, Breadcrumbs, Link as MuiLink, Divider, CircularProgress } from '@mui/material';
+import Box from '@mui/material/Box';
 import MenuIcon from '@mui/icons-material/Menu';
 import LogoutIcon from '@mui/icons-material/Logout';
 import HomeIcon from '@mui/icons-material/Home';
@@ -8,6 +8,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import PersonIcon from '@mui/icons-material/Person';
 import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { useState, Suspense, useRef } from 'react'; // Import useRef
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
@@ -26,6 +27,7 @@ const nameMap: { [key: string]: string } = {
   'report': 'Activity Report',
   'profile': 'User Profile',
   'input-visit': 'Create Planning',
+  'add-customer': 'Add Customer',
   'history': 'Order History'
 };
 
@@ -70,6 +72,10 @@ const Layout = ({ onLogout, employeeId, employeeName }: LayoutProps) => {
         <ListItemButton component={RouterLink} to="/input-visit" selected={location.pathname.startsWith('/input-visit')}>
           <AddLocationAltIcon sx={{ mr: 1 }} />
           <ListItemText primary="Create Planning" />
+        </ListItemButton>
+        <ListItemButton component={RouterLink} to="/add-customer" selected={location.pathname.startsWith('/add-customer')}>
+          <PersonAddIcon sx={{ mr: 1 }} />
+          <ListItemText primary="Add Customer" />
         </ListItemButton>
         {/* <ListItemButton component={RouterLink} to="/activity" selected={location.pathname.startsWith('/activity')}>
           <HistoryIcon sx={{ mr: 1 }} />

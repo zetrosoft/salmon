@@ -1,5 +1,6 @@
 import axios from 'axios';
-import type { AxiosInstance, AxiosError } from 'axios';
+import type { AxiosInstance, AxiosError }                       from 'axios';
+import type { NewCustomerData } from '../types/customer';
 
 
 let api: AxiosInstance;
@@ -62,6 +63,18 @@ interface CreateSalesVisitPlanResponse {
   message?: string;
 }
 
+// --- New Customer Interfaces ---
+
+
+export interface CreateCustomerResponse {
+  status: 'success' | 'error';
+  message: string;
+  data?: {
+    name: string;
+    // Include other relevant fields if the backend returns them
+  };
+}
+
 
 export const initializeApi = async () => {
   try {
@@ -89,15 +102,22 @@ export const initializeApi = async () => {
   // Remove the Expect header to prevent 417 errors with some servers/proxies
   delete api.defaults.headers.common['Expect'];
 
+  // Panggil fetchCsrfToken() di sini untuk memastikan token tersedia
+  // sebelum interceptor berjalan untuk permintaan pertama.
+  await fetchCsrfToken(); 
+
   // Add a request interceptor to include the CSRF token for all state-changing requests
   api.interceptors.request.use(config => {
-    // Only add CSRF token for non-login POST/PUT/DELETE requests
-    if ((config.method === 'post' || config.method === 'put' || config.method === 'delete') &&
-        config.url !== '/api/method/sales_monitor.api.pwa_login') {
-      const csrfToken = sessionStorage.getItem('frappe_csrf_token'); // Get from sessionStorage
+    // Tambahkan CSRF token untuk SEMUA permintaan POST/PUT/DELETE
+    if (config.method === 'post' || config.method === 'put' || config.method === 'delete') {
+      const csrfToken = sessionStorage.getItem('frappe_csrf_token'); 
         
       if (csrfToken) {
         config.headers['X-Frappe-CSRF-Token'] = csrfToken;
+      } else {
+        // Jika token tidak ditemukan, mungkin ada masalah atau token belum diambil.
+        // Untuk POST login, ini berarti akan gagal.
+        console.warn("CSRF token not found in sessionStorage for a state-changing request.");
       }
     }
     return config;
@@ -126,10 +146,7 @@ export const login = async (username: string, password: string): Promise<LoginRe
     // console.log("DEBUG frappeApi: Raw responseData from backend:", responseData); // Tambahkan log ini
 
     if (responseData.status === 'success') {
-      const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrf_token='));
-      if (csrfToken) {
-        sessionStorage.setItem('frappe_csrf_token', csrfToken.split('=')[1]);
-      }
+      // CSRF token now handled by initializeApi and interceptor
       sessionStorage.setItem('frappe_user_id', responseData.user_id);
       sessionStorage.setItem('frappe_full_name', responseData.full_name);
       return {
@@ -480,3 +497,76 @@ export const get_sales_person_customers = async (): Promise<SalesPersonCustomers
     throw new Error(axiosError.response?.data?.message || 'Failed to fetch sales person customers.');
   }
 };
+
+
+// --- Functions for New Customer ---
+
+/**
+ * Fetches a list of items for a given DocType (e.g., 'Customer Group', 'Territory').
+ */
+const getDoctypeItems = async (doctype: string): Promise<string[]> => {
+  try {
+    const response = await api.get('/api/method/frappe.client.get_list', {
+      params: {
+        doctype: doctype,
+        fields: JSON.stringify(['name']),
+        limit_page_length: 1000, // Fetch a large number
+      },
+    });
+    return response.data.message.map((d: { name: string }) => d.name) || [];
+  } catch (error) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error(`Error fetching ${doctype}:`, axiosError.response?.data || axiosError.message);
+    throw new Error(axiosError.response?.data?.message || `Failed to fetch ${doctype}.`);
+  }
+};
+
+export const getCustomerGroups = async (): Promise<string[]> => {
+  return getDoctypeItems('Customer Group');
+};
+
+export const getTerritories = async (): Promise<string[]> => {
+  return getDoctypeItems('Territory');
+};
+
+/**
+ * Submits the new customer data to the custom backend API endpoint.
+ * Note: The backend endpoint 'sales_monitor.api.create_customer' needs to be created.
+ */
+export const createCustomer = async (customerData: NewCustomerData): Promise<CreateCustomerResponse> => {
+  try {
+    const payload = {
+      customer_data: {
+        customer_name: customerData.customer_name,
+        customer_group: customerData.customer_group,
+        territory: customerData.territory,
+        custom_owner_name: customerData.owner_name,
+        custom_whatsapp_no: customerData.whatsapp_no,
+        custom_address: customerData.address,
+        custom_city: customerData.city,
+        custom_latitude: customerData.latitude,
+        custom_longitude: customerData.longitude,
+        custom_customer_type: customerData.customer_type,
+        sales_person: customerData.sales_person,
+      }
+    };
+
+    console.log("Sending payload to create_customer:", JSON.stringify(payload, null, 2));
+
+    const response = await api.post('/api/method/sales_monitor.api.create_customer', payload);
+    
+    console.log("Received response from create_customer:", response.data);
+
+    return response.data.message;
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError<{ message: string }>;
+    console.error("Error creating customer:", axiosError.response?.data || axiosError.message);
+    const errorMessage = axiosError.response?.data?.message || 'Failed to create customer due to a network or server error.';
+    return {
+      status: 'error',
+      message: errorMessage,
+    };
+  }
+};
+
+
