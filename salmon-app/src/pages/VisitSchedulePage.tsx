@@ -626,7 +626,7 @@ const VisitSchedulePage = () => {
 
   
 
-                                            } else if (distance > 5) { // Jarak sudah dekat (antara 5 dan 100 meter)
+                                            } else if (distance > 50) { // Jarak sudah dekat (antara 5 dan 100 meter)
 
   
 
