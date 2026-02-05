@@ -135,8 +135,30 @@ interface LoginResponse {
   userId?: string;
 }
 
+/**
+ * Menghapus semua cookie yang terkait dengan domain saat ini.
+ * Digunakan untuk memastikan login bersih tanpa sisa sesi lama (sid) yang memicu CSRF error.
+ */
+export const clearAllCookies = () => {
+  const cookies = document.cookie.split(";");
+
+  for (let i = 0; i < cookies.length; i++) {
+    const cookie = cookies[i];
+    const eqPos = cookie.indexOf("=");
+    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+    
+    // Hapus cookie untuk root path dan path aplikasi
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+    // Terkadang cookie diset dengan atribut spesifik, kita coba hapus seaman mungkin
+  }
+};
+
 export const login = async (username: string, password: string): Promise<LoginResponse> => {
   try {
+    // Bersihkan cookie dan session storage sebelum login untuk menghindari CSRF token mismatch
+    clearAllCookies();
+    sessionStorage.clear();
+    
     const response = await api.post('/api/method/sales_monitor.api.pwa_login', {
       usr: username,
       pwd: password,

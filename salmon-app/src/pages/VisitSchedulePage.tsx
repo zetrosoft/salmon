@@ -925,7 +925,15 @@ const VisitSchedulePage = () => {
                     <IconButton onClick={() => navigate(`/notes/${plan.name}`)} aria-label="Add Notes"><Tooltip title="Add Notes"><PlaylistAdd /></Tooltip></IconButton>
                   </Box>
                   <Box>
-                    {plan.status === 'Planned' && <Button variant="contained" color="secondary" onClick={() => handleCheckIn(plan.name)}>Check In</Button>}
+                    {(plan.status === 'Planned' || plan.status === 'Completed') && (
+                      <Button 
+                        variant="contained" 
+                        color="secondary" 
+                        onClick={() => handleCheckIn(plan.name)}
+                      >
+                        {plan.status === 'Completed' ? 'Re-Check In' : 'Check In'}
+                      </Button>
+                    )}
                     {plan.status === 'Checked In' && <Button variant="contained" color="success" onClick={() => handleOpenCheckout(plan.name)}>Check Out</Button>}
                   </Box>
                 </CardActions>
