@@ -897,48 +897,58 @@ const VisitSchedulePage = () => {
           <Alert severity="info" sx={{ mt: 2 }}>No visit plans found.</Alert>
         ) : (
           <Box>
-            {visitPlans.map((plan, index) => (
-              /**
-               * @component CardKunjungan
-               * @description Menampilkan detail satu rencana kunjungan.
-               *              Termasuk nama toko, alamat, waktu perencanaan, status, dan tombol aksi.
-               */
-              <Card key={plan.name} sx={{ mb: 3, border: '1px solid #e0e0e0', boxShadow: '4px 4px 8px rgba(0,0,0,0.1)', width: isMobile ? '100%' : 'auto' }} ref={visitPlans.length === index + 1 ? lastPlanElementRef : null}>
-                <CardHeader
-                  avatar={<StorefrontIcon sx={{ color: 'primary.main', fontSize: 40 }} />}
-                  title={<Typography variant="h6" sx={{ fontWeight: 'bold' }}>{plan.store_name}</Typography>}
-                  subheader={<Typography variant="body2" color="text.secondary">{plan.address}</Typography>}
-                  sx={{ backgroundColor: 'grey.100', py: 1.5 }}
-                />
-                <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Chip label={<Box component="span">Planning :{' '}<Typography component="span" sx={{ fontWeight: 'bold', color: '#FFFFFF' }}>{plan.planned_visit_time ? moment(plan.planned_visit_time, 'DD-MM-YYYY HH:mm').format('DD-MM-YYYY HH:mm') : 'N/A'}</Typography></Box>} color="info" size="small" />
-                    {getStatusChip(plan)}
-                  </Box>
-                  <Chip icon={<PlaylistAdd />} label={`CheckIn: ${formatDateTime(plan.checkin_time, plan.planned_visit_time)}`} variant="outlined" size="small" />
-                  <Chip icon={<PlaylistAdd />} label={`CheckOut: ${formatDateTime(plan.checkout_time, plan.planned_visit_time)}`} variant="outlined" size="small" />
-                  {plan.notes && <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>Notes: {plan.notes}</Typography>}
-                </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5, backgroundColor: 'grey.50' }}>
-                  <Box>
-                    <IconButton onClick={() => handleNavigate(plan)} aria-label="Navigate"><Tooltip title="Navigate to Customer"><NavigationIcon sx={{ color: 'primary.main' }} /></Tooltip></IconButton>
-                    <IconButton onClick={() => navigate(`/notes/${plan.name}`)} aria-label="Add Notes"><Tooltip title="Add Notes"><PlaylistAdd /></Tooltip></IconButton>
-                  </Box>
-                  <Box>
-                    {(plan.status === 'Planned' || plan.status === 'Completed') && (
-                      <Button 
-                        variant="contained" 
-                        color="secondary" 
-                        onClick={() => handleCheckIn(plan.name)}
-                      >
-                        {plan.status === 'Completed' ? 'Re-Check In' : 'Check In'}
-                      </Button>
-                    )}
-                    {plan.status === 'Checked In' && <Button variant="contained" color="success" onClick={() => handleOpenCheckout(plan.name)}>Check Out</Button>}
-                  </Box>
-                </CardActions>
-              </Card>
-            ))}
+            {visitPlans.map((plan, index) => {
+              const isToday = plan.planned_visit_time && moment(plan.planned_visit_time, 'DD-MM-YYYY').isSame(moment(), 'day');
+              const isPast = plan.planned_visit_time && moment(plan.planned_visit_time, 'DD-MM-YYYY').isBefore(moment(), 'day');
+
+              // Jika sudah selesai dan tanggalnya masa lalu, jangan tampilkan kartu
+              if (plan.status === 'Completed' && isPast) {
+                return null;
+              }
+              
+              return (
+                /**
+                 * @component CardKunjungan
+                 * @description Menampilkan detail satu rencana kunjungan.
+                 *              Termasuk nama toko, alamat, waktu perencanaan, status, dan tombol aksi.
+                 */
+                <Card key={plan.name} sx={{ mb: 3, border: '1px solid #e0e0e0', boxShadow: '4px 4px 8px rgba(0,0,0,0.1)', width: isMobile ? '100%' : 'auto' }} ref={visitPlans.length === index + 1 ? lastPlanElementRef : null}>
+                  <CardHeader
+                    avatar={<StorefrontIcon sx={{ color: 'primary.main', fontSize: 40 }} />}
+                    title={<Typography variant="h6" sx={{ fontWeight: 'bold' }}>{plan.store_name}</Typography>}
+                    subheader={<Typography variant="body2" color="text.secondary">{plan.address}</Typography>}
+                    sx={{ backgroundColor: 'grey.100', py: 1.5 }}
+                  />
+                  <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip label={<Box component="span">Planning :{' '}<Typography component="span" sx={{ fontWeight: 'bold', color: '#FFFFFF' }}>{plan.planned_visit_time ? moment(plan.planned_visit_time, 'DD-MM-YYYY HH:mm').format('DD-MM-YYYY HH:mm') : 'N/A'}</Typography></Box>} color="info" size="small" />
+                      {getStatusChip(plan)}
+                    </Box>
+                    <Chip icon={<PlaylistAdd />} label={`CheckIn: ${formatDateTime(plan.checkin_time, plan.planned_visit_time)}`} variant="outlined" size="small" />
+                    <Chip icon={<PlaylistAdd />} label={`CheckOut: ${formatDateTime(plan.checkout_time, plan.planned_visit_time)}`} variant="outlined" size="small" />
+                    {plan.notes && <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>Notes: {plan.notes}</Typography>}
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5, backgroundColor: 'grey.50' }}>
+                    <Box>
+                      <IconButton onClick={() => handleNavigate(plan)} aria-label="Navigate"><Tooltip title="Navigate to Customer"><NavigationIcon sx={{ color: 'primary.main' }} /></Tooltip></IconButton>
+                      <IconButton onClick={() => navigate(`/notes/${plan.name}`)} aria-label="Add Notes"><Tooltip title="Add Notes"><PlaylistAdd /></Tooltip></IconButton>
+                    </Box>
+                    <Box>
+                      {isToday && (plan.status === 'Planned' || plan.status === 'Completed') && (
+                        <Button 
+                          variant="contained" 
+                          color="secondary" 
+                          onClick={() => handleCheckIn(plan.name)}
+                        >
+                          {plan.status === 'Completed' ? 'Re-Check In' : 'Check In'}
+                        </Button>
+                      )}
+                      {plan.status === 'Checked In' && <Button variant="contained" color="success" onClick={() => handleOpenCheckout(plan.name)}>Check Out</Button>}
+                    </Box>
+                  </CardActions>
+                </Card>
+              );
+            })}
             {isFetchingMore && <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}><CircularProgress /></Box>}
             {!hasMore && <Typography variant="body2" align="center" color="text.secondary" sx={{ my: 2 }}>You have reached the end of the list.</Typography>}
           </Box>
