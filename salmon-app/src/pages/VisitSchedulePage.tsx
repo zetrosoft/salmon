@@ -9,6 +9,7 @@ import { Typography, Container, Box, Button, Dialog, DialogTitle, DialogContent,
 import { keyframes } from '@mui/system';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getVisitPlans, submitVisitUpdate, PAGE_LENGTH, getCustomerMasterLocation, updateCustomerLocation } from '../api/frappeApi';
+import { getDistanceInMeters, formatDistance } from '../utils/locationUtils';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import HistoryIcon from '@mui/icons-material/History';
 import StorefrontIcon from '@mui/icons-material/Storefront';
@@ -52,6 +53,7 @@ interface VisitPlan {
   address: string;
   status: 'Draft' | 'Planned' | 'Checked In' | 'Completed' | 'Canceled';
   parent_docstatus: number;
+  customer_group?: string;
   planned_visit_time?: string;
   checkin_time?: string;
   checkout_time?: string;
@@ -95,42 +97,7 @@ const ScheduleCardSkeleton = () => (
   </Card>
 );
 
-/**
- * @function getDistanceInMeters
- * @description Menghitung jarak antara dua titik koordinat geografis (latitude dan longitude) dalam meter
- *              menggunakan formula Haversine.
- * @param {number} lat1 - Latitude titik pertama.
- * @param {number} lon1 - Longitude titik pertama.
- * @param {number} lat2 - Latitude titik kedua.
- * @param {number} lon2 - Longitude titik kedua.
- * @returns {number} Jarak antara dua titik dalam meter.
- */
-const getDistanceInMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371e3; // metres
-  const φ1 = lat1 * Math.PI/180;
-  const φ2 = lat2 * Math.PI/180;
-  const Δφ = (lat2-lat1) * Math.PI/180;
-  const Δλ = (lon2-lon1) * Math.PI/180;
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const d = R * c;
-  return d;
-}
 
-/**
- * @function formatDistance
- * @description Memformat jarak dari meter ke format yang lebih mudah dibaca (meter atau kilometer).
- * @param {number} meters - Jarak dalam meter.
- * @returns {string} Jarak yang diformat (misalnya, "150 meter" atau "1.2 km").
- */
-const formatDistance = (meters: number): string => {
-    if (meters < 500) {
-        return `${Math.round(meters)} meter`;
-    } else {
-        const kilometers = meters / 1000;
-        return `${kilometers.toFixed(1)} km`;
-    }
-};
 
 /**
  * @component VisitSchedulePage
@@ -572,97 +539,107 @@ const VisitSchedulePage = () => {
 
   
 
-          // --- STEP 2: Fetch Master Location ---
-
-          const masterLocation = await getCustomerMasterLocation(plan.store_name);
+                    // --- STEP 2: Fetch Master Location ---
 
   
 
-                    // --- STEP 3: Distance Check --- (Only if master location exists)
+                    const masterLocation = await getCustomerMasterLocation(plan.store_name);
 
   
 
-                                        if (masterLocation && masterLocation.latitude && masterLocation.longitude) {
+          
 
   
 
-                    
+                    // --- STEP 3: Distance Check --- (Only if master location exists and customer group is not 'Mobile')
 
   
 
-                                            const distance = getDistanceInMeters(masterLocation.latitude, masterLocation.longitude, liveLocation.latitude, liveLocation.longitude);
+                    if (plan.customer_group !== 'Mobile') { // Bypass distance check for 'Mobile' customer group
 
   
 
-                    
+                      if (masterLocation && masterLocation.latitude && masterLocation.longitude) {
 
   
 
-                                            if (distance > 100) { // Jarak terlalu jauh
+                        const distance = getDistanceInMeters(masterLocation.latitude, masterLocation.longitude, liveLocation.latitude, liveLocation.longitude);
 
   
 
-                                                setIsInitialLoading(false);
+          
 
   
 
-                                                setDistanceConfirm({ isOpen: true, distance: distance, type: 'too_far' }); // Menambahkan 'type'
+                        if (distance > 100) { // Jarak terlalu jauh
 
   
 
-                                                // Crucially, stop the camera stream if the main dialog won\'t open yet
+                          setIsInitialLoading(false);
 
   
 
-                                                if (currentCameraStream) currentCameraStream.getTracks().forEach(track => track.stop());
+                          setDistanceConfirm({ isOpen: true, distance: distance, type: 'too_far' }); // Menambahkan 'type'
 
   
 
-                                                setActiveCameraStream(null); // Clear state
+                          // Crucially, stop the camera stream if the main dialog won\'t open yet
 
   
 
-                                                return;
+                          if (currentCameraStream) currentCameraStream.getTracks().forEach(track => track.stop());
 
   
 
-                                            } else if (distance > 50) { // Jarak sudah dekat (antara 5 dan 100 meter)
+                          setActiveCameraStream(null); // Clear state
 
   
 
-                                                setIsInitialLoading(false);
+                          return;
 
   
 
-                                                setDistanceConfirm({ isOpen: true, distance: distance, type: 'almost_there' }); // Menambahkan 'type'
+                        } else if (distance > 50) { // Jarak sudah dekat (antara 5 dan 100 meter)
 
   
 
-                                                // Crucially, stop the camera stream if the main dialog won won't open yet
+                          setIsInitialLoading(false);
 
   
 
-                                                if (currentCameraStream) currentCameraStream.getTracks().forEach(track => track.stop());
+                          setDistanceConfirm({ isOpen: true, distance: distance, type: 'almost_there' }); // Menambahkan 'type'
 
   
 
-                                                setActiveCameraStream(null); // Clear state
+                          // Crucially, stop the camera stream if the main dialog won won't open yet
 
   
 
-                                                return;
+                          if (currentCameraStream) currentCameraStream.getTracks().forEach(track => track.stop());
 
   
 
-                                            }
+                          setActiveCameraStream(null); // Clear state
 
   
 
-                                        }
+                          return;
 
   
 
-                    
+                        }
+
+  
+
+                      }
+
+  
+
+                    }
+
+  
+
+          
 
   
 
@@ -674,10 +651,6 @@ const VisitSchedulePage = () => {
 
   
 
-            
-
-  
-
                     setIsInitialLoading(false);
 
   
@@ -686,11 +659,11 @@ const VisitSchedulePage = () => {
 
   
 
-            
+          
 
   
 
-                } catch (error) {
+                  } catch (error) {
 
           console.error("DEBUG: Error during pre-checkout validation:", error);
 
